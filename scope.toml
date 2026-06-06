@@ -1,0 +1,221 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Scope Graph — birth certificate for the tideGlass Targeted GuideStone.
+# Declares which ecosystem components contribute to this artifact.
+#
+# Pattern source: lithoSpore/artifact/scope.toml (LTEE instance)
+# This is a DRAFT for ecosystem review. Module details will sharpen
+# during Phase 0 archaeology as GPS code is inventoried.
+
+[guidestone]
+name = "tideglass-guidestone"
+version = "0.1.0"
+target = "GPS Platform — Bin Chen Lab, MSU (Cell 2026)"
+created = "2026-06-06"
+standard = "TARGETED_GUIDESTONE_STANDARD v1.0"
+targets_file = "data/targets/gps_validation_targets.toml"
+graph_file = "graphs/tideglass_guidestone.toml"
+
+# --- Contributing Springs ---
+
+[[spring]]
+name = "healthSpring"
+contributes = [
+    "Hill dose-response (IC50 validation, Exp001/Exp093)",
+    "MATRIX scoring (Fajgenbaum reversal framework, Exp090)",
+    "Anderson geometry (tissue propagation prediction)",
+    "Population PK Monte Carlo (compound distribution modeling)",
+    "ChEMBL bioactivity pipeline (JAK panel, Exp093)",
+    "ADDRC HTS pipeline (hit scoring, Exp091)",
+    "Selectivity index (compound ranking, Exp092)",
+    "RGES enrichment scoring (novel — extends score_panel)",
+    "MCTS tree search (novel — chemical space optimization)",
+]
+modules = ["tideglass-rges", "tideglass-screen", "tideglass-molsearch", "tideglass-octad", "tideglass-nf"]
+papers = ["Chen2017", "Zeng2021", "Xing2026"]
+
+[[spring]]
+name = "wetSpring"
+contributes = [
+    "ChEMBL data fetch (handle_chembl_fetch via NestGate)",
+    "PubChem data fetch (handle_pubchem_fetch via NestGate)",
+    "NCBI GEO fetch (L1000 expression profiles)",
+    "NestGate content-addressing (BLAKE3 on ingested data)",
+    "Provenance trio (session + step + completion on every fetch)",
+    "GCTx/HDF5 streaming parse (novel — extends NestGate pattern)",
+]
+modules = ["tideglass-rcl", "tideglass-gps4drug", "tideglass-screen"]
+papers = ["Subramanian2017"]
+
+[[spring]]
+name = "neuralSpring"
+contributes = [
+    "Deep learning model training patterns",
+    "Multi-network architecture (RCL co-training)",
+    "SMILES encoding to learned representation",
+    "Model checkpoint verification (BLAKE3 chain)",
+    "Training convergence monitoring",
+]
+modules = ["tideglass-rcl", "tideglass-gps4drug"]
+papers = ["Xing2026"]
+
+[[spring]]
+name = "hotSpring"
+contributes = [
+    "Anderson disorder analogy (tissue geometry for drug propagation)",
+    "Effective dimension mapping (d_eff for target tissues)",
+    "Conformational energy landscapes (compound flexibility)",
+]
+modules = ["tideglass-nf"]
+papers = ["Anderson analogy", "Xing2026 (tissue extension)"]
+
+# --- Seven Science Modules ---
+# Each module validates a specific claim from the paper chain.
+# Binary names follow lithoSpore convention: project-module.
+
+[[module]]
+name = "rges_correlation"
+binary = "tideglass-rges"
+data_dir = "artifact/data/chen_2017_rges"
+expected = "validation/expected/module1_rges.json"
+tier1_notebook = "notebooks/module1_rges/rges_correlation.py"
+paper = "Chen 2017 — Reversal of cancer gene expression (Nat Commun 8:16022)"
+doi = "10.1038/ncomms16022"
+claim = "RGES correlates with IC50 (r=0.52, P=2.3e-3 in MCF7)"
+depends_on = []
+
+[[module]]
+name = "rcl_noise_cleaning"
+binary = "tideglass-rcl"
+data_dir = "artifact/data/lincs_vcap_t1"
+expected = "validation/expected/module2_rcl.json"
+tier1_notebook = "notebooks/module2_rcl/rcl_vcap_cleaning.py"
+paper = "Xing 2026 — GPS (Cell, RCL component)"
+doi = "10.1016/j.cell.2026.02.023"
+claim = "RCL improves VCAP_t1 profile signal-to-noise vs raw LINCS"
+depends_on = []
+
+[[module]]
+name = "expression_prediction"
+binary = "tideglass-gps4drug"
+data_dir = "artifact/data/gps4drug_heldout"
+expected = "validation/expected/module3_prediction.json"
+tier1_notebook = "notebooks/module3_prediction/gps4drug_heldout.py"
+paper = "Xing 2026 — GPS (Cell, GPS4Drug component)"
+doi = "10.1016/j.cell.2026.02.023"
+claim = "GPS4Drug predicts expression from structure (R² on held-out test set)"
+depends_on = ["rcl_noise_cleaning"]
+
+[[module]]
+name = "reversal_screening"
+binary = "tideglass-screen"
+data_dir = "artifact/data/zinc_hcc_screen"
+expected = "validation/expected/module4_screening.json"
+tier1_notebook = "notebooks/module4_screening/zinc_reversal_screen.py"
+paper = "Xing 2026 — GPS (Cell, screening validation)"
+doi = "10.1016/j.cell.2026.02.023"
+claim = "ZINC screening recovers known HCC actives (enrichment AUC)"
+depends_on = ["expression_prediction"]
+
+[[module]]
+name = "mcts_optimization"
+binary = "tideglass-molsearch"
+data_dir = "artifact/data/molsearch_hcc"
+expected = "validation/expected/module5_mcts.json"
+tier1_notebook = "notebooks/module5_mcts/molsearch_hcc_lead.py"
+paper = "Xing 2026 — GPS (Cell, MolSearch component)"
+doi = "10.1016/j.cell.2026.02.023"
+claim = "MCTS optimizes HCC lead: IC50 4uM to 0.5uM, selectivity maintained"
+depends_on = ["expression_prediction"]
+
+[[module]]
+name = "octad_parity"
+binary = "tideglass-octad"
+data_dir = "artifact/data/octad_hcc_baseline"
+expected = "validation/expected/module6_octad.json"
+tier1_notebook = "notebooks/module6_octad/octad_parity.py"
+paper = "Zeng 2021 — OCTAD (Nat Protocols 16:728-753)"
+doi = "10.1038/s41596-020-00430-z"
+claim = "GPS screening exceeds OCTAD repurposing for HCC targets"
+depends_on = ["reversal_screening"]
+
+[[module]]
+name = "nf_extension"
+binary = "tideglass-nf"
+data_dir = "artifact/data/nf_disease_signatures"
+expected = "validation/expected/module7_nf.json"
+tier1_notebook = "notebooks/module7_nf/nf_reversal_screen.py"
+paper = "Novel (no prior publication — first NF application of GPS)"
+doi = ""
+claim = "GPS reversal scoring identifies candidates for NF1-driven tumors"
+depends_on = ["reversal_screening"]
+
+# --- Primals (Tier 3, optional graceful degradation) ---
+
+[[primal]]
+name = "rhizoCrypt"
+tier = 3
+required = false
+purpose = "DAG provenance chain for each module execution"
+
+[[primal]]
+name = "loamSpine"
+tier = 3
+required = false
+purpose = "Certificate chain for model weight verification"
+
+[[primal]]
+name = "sweetGrass"
+tier = 3
+required = false
+purpose = "Attribution braid (6 papers, LINCS program, ChEMBL, NF Data Portal)"
+
+[[primal]]
+name = "toadStool"
+tier = 3
+required = false
+purpose = "GPU streaming dispatch for RCL training + MCTS tree search"
+
+[[primal]]
+name = "nestGate"
+tier = 2
+required = false
+purpose = "Content-addressed data fetch (LINCS L1000, ChEMBL, PubChem, ZINC)"
+
+[[primal]]
+name = "barraCuda"
+tier = 2
+required = false
+purpose = "WGSL shader dispatch for RGES batch scoring and MCTS evaluation"
+
+# --- Foundation Threads ---
+
+[[foundation_thread]]
+id = "03"
+name = "Immunology / Drug Discovery"
+datasets = ["lincs_l1000_level5", "chembl_jak_panel", "nf_data_portal", "zinc_screened_subset"]
+
+[[foundation_thread]]
+id = "07"
+name = "Anderson Framework"
+datasets = ["anderson_tissue_geometry"]
+notes = "d_eff for nerve sheath (NF, d=2.4) and liver (HCC) tissue"
+
+[[foundation_thread]]
+id = "10"
+name = "Provenance / Spore Ingestion"
+datasets = []
+notes = "Model weight provenance chain — novel category for ML artifacts"
+
+# --- Source Metadata ---
+
+[source]
+repo = "git@github.com:protoKarya/tideGlass.git"
+repo_https = "https://github.com/protoKarya/tideGlass.git"
+branch = "main"
+ecosystem_repo = "git@github.com:sporeGarden/ecoPrimals.git"
+ecosystem_repo_https = "https://github.com/sporeGarden/ecoPrimals.git"
+rust_toolchain = "stable"
+rust_target = "x86_64-unknown-linux-musl"
+containerfile = "Containerfile"
+license = "AGPL-3.0-or-later"

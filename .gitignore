@@ -1,0 +1,40 @@
+# Rust
+target/
+Cargo.lock
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.eggs/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+*.egg
+
+# Data artifacts (fetched, not committed)
+artifact/data/
+artifact/models/
+*.h5
+*.hdf5
+*.gctx
+*.pkl
+*.pt
+*.pth
+*.ckpt
+
+# Zenodo downloads
+*.zip
+*.tar.gz
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
