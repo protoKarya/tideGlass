@@ -1,0 +1,315 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Cellular deployment graph: tideGlass — sovereign drug repurposing protist
+#
+# Spring identity: tideGlass (protist), consuming healthSpring validated science.
+# Gate: westGate (519 GB local CAS federation).
+# Data: LINCS L1000, ChEMBL, PubChem, ZINC, TCGA, GEO via nestGate CAS.
+#
+# Deploy: biomeos deploy --graph graphs/cells/tideglass_cell.toml
+
+[graph]
+id = "tideglass-cell"
+name = "tideglass-cell"
+version = "2.0.0"
+description = "tideGlass — NUCLEUS composition for GPS platform sovereign rebuild"
+coordination = "sequential"
+
+[graph.metadata]
+cell_type = "protist"
+spring = "healthSpring"
+product = "tideGlass"
+gate = "westGate"
+domain = "drug_repurposing"
+security_model = "btsp_enforced"
+transport = "uds_only"
+composition_model = "nest_heavy"
+petaltongue_mode = "live"
+data_federation_gb = 519
+
+[graph.data_dependencies]
+# All datasets accessed via nestGate CAS on westGate (local ZFS, no mesh).
+sources = [
+    "lincs_l1000_level5",
+    "chembl_37",
+    "pubchem_bioassay",
+    "zinc20_screened",
+    "tcga_xena_hub",
+    "geo_soft",
+    "bindingdb",
+    "gps_platform_zenodo",
+    "chebi",
+    "every_cure_matrix",
+    "nf_data_portal",
+]
+access_pattern = "nestgate.content.get"
+
+[graph.ipc_methods]
+# tideGlass protist exposes these JSON-RPC methods over UDS (UniBin).
+exposed = [
+    "capabilities.list",
+    "health.liveness",
+    "health.check",
+    "health.readiness",
+    "science.rges_screen",
+    "science.rcl_select",
+    "science.gps4drug_predict",
+    "science.compound_screen",
+    "science.mcts_optimize",
+    "science.octad_benchmark",
+    "science.nf_score",
+]
+
+[graph.modules]
+# Seven science module crates composed by the tideglass UniBin.
+crates = [
+    "tideglass-rges",
+    "tideglass-rcl",
+    "tideglass-gps4drug",
+    "tideglass-screen",
+    "tideglass-molsearch",
+    "tideglass-octad",
+    "tideglass-nf",
+]
+binary = "tideglass"
+
+# ── Tower Atomic ─────────────────────────────────────────────────────
+
+[[nodes]]
+id = "beardog"
+output = "beardog-ready"
+capabilities = ["crypto", "security"]
+
+[nodes.primal]
+by_capability = "security"
+
+[nodes.operation]
+name = "start"
+
+[nodes.operation.params]
+mode = "server"
+family_id = "${FAMILY_ID}"
+gate = "westGate"
+
+[nodes.constraints]
+timeout_ms = 30000
+
+[[nodes]]
+id = "songbird"
+depends_on = ["beardog"]
+output = "songbird-ready"
+capabilities = ["discovery", "network"]
+
+[nodes.primal]
+by_capability = "discovery"
+
+[nodes.operation]
+name = "start"
+
+[nodes.operation.params]
+mode = "server"
+family_id = "${FAMILY_ID}"
+gate = "westGate"
+
+[nodes.constraints]
+timeout_ms = 30000
+
+# ── Compute + Storage ────────────────────────────────────────────────
+
+[[nodes]]
+id = "barracuda"
+depends_on = ["beardog"]
+output = "barracuda-ready"
+capabilities = ["tensor", "stats", "linalg"]
+
+[nodes.primal]
+by_capability = "tensor"
+
+[nodes.operation]
+name = "start"
+
+[nodes.operation.params]
+mode = "server"
+family_id = "${FAMILY_ID}"
+
+[nodes.constraints]
+timeout_ms = 30000
+
+[[nodes]]
+id = "nestgate"
+depends_on = ["beardog", "songbird"]
+output = "nestgate-ready"
+capabilities = ["storage", "content"]
+
+[nodes.primal]
+by_capability = "storage"
+
+[nodes.operation]
+name = "start"
+
+[nodes.operation.params]
+mode = "server"
+family_id = "${FAMILY_ID}"
+gate = "westGate"
+cas_root = "${WESTGATE_CAS_ROOT}"
+
+[nodes.constraints]
+timeout_ms = 60000
+
+[[nodes]]
+id = "petaltongue"
+depends_on = ["beardog", "songbird"]
+output = "petaltongue-ready"
+capabilities = ["visualization", "interaction"]
+
+[nodes.primal]
+by_capability = "visualization"
+
+[nodes.operation]
+name = "start"
+
+[nodes.operation.params]
+mode = "live"
+family_id = "${FAMILY_ID}"
+
+[nodes.constraints]
+timeout_ms = 20000
+
+# ── Provenance Trio ──────────────────────────────────────────────────
+
+[[nodes]]
+id = "rhizocrypt"
+depends_on = ["beardog", "songbird"]
+output = "rhizocrypt-ready"
+capabilities = ["dag", "provenance"]
+fallback = "skip"
+
+[nodes.primal]
+by_capability = "dag"
+
+[nodes.operation]
+name = "start"
+
+[nodes.operation.params]
+mode = "server"
+family_id = "${FAMILY_ID}"
+
+[nodes.constraints]
+timeout_ms = 30000
+
+[[nodes]]
+id = "loamspine"
+depends_on = ["beardog", "songbird", "rhizocrypt"]
+output = "loamspine-ready"
+capabilities = ["ledger", "spine"]
+fallback = "skip"
+
+[nodes.primal]
+by_capability = "ledger"
+
+[nodes.operation]
+name = "start"
+
+[nodes.operation.params]
+mode = "server"
+family_id = "${FAMILY_ID}"
+
+[nodes.constraints]
+timeout_ms = 30000
+
+[[nodes]]
+id = "sweetgrass"
+depends_on = ["beardog", "songbird", "loamspine"]
+output = "sweetgrass-ready"
+capabilities = ["commit", "attribution"]
+fallback = "skip"
+
+[nodes.primal]
+by_capability = "commit"
+
+[nodes.operation]
+name = "start"
+
+[nodes.operation.params]
+mode = "server"
+family_id = "${FAMILY_ID}"
+
+[nodes.constraints]
+timeout_ms = 30000
+
+# ── tideGlass Protist ────────────────────────────────────────────────
+
+[[nodes]]
+id = "tideglass"
+depends_on = [
+    "beardog",
+    "songbird",
+    "nestgate",
+    "barracuda",
+    "petaltongue",
+    "rhizocrypt",
+    "loamspine",
+    "sweetgrass",
+]
+output = "tideglass-ready"
+capabilities = ["science", "health"]
+
+[nodes.protist]
+binary = "tideglass"
+spring = "healthSpring"
+gate = "westGate"
+
+[nodes.operation]
+name = "start"
+
+[nodes.operation.params]
+mode = "server"
+family_id = "${FAMILY_ID}"
+modules = [
+    "tideglass-rges",
+    "tideglass-rcl",
+    "tideglass-gps4drug",
+    "tideglass-screen",
+    "tideglass-molsearch",
+    "tideglass-octad",
+    "tideglass-nf",
+]
+
+[nodes.capabilities_provided]
+"capabilities.list" = "capabilities.list"
+"health.liveness" = "health.liveness"
+"health.check" = "health.check"
+"health.readiness" = "health.readiness"
+"science.rges_screen" = "science.rges_screen"
+"science.rcl_select" = "science.rcl_select"
+"science.gps4drug_predict" = "science.gps4drug_predict"
+"science.compound_screen" = "science.compound_screen"
+"science.mcts_optimize" = "science.mcts_optimize"
+"science.octad_benchmark" = "science.octad_benchmark"
+"science.nf_score" = "science.nf_score"
+
+[nodes.constraints]
+timeout_ms = 120000
+
+# ── Validation ───────────────────────────────────────────────────────
+
+[[nodes]]
+id = "validate-cell"
+depends_on = ["tideglass", "nestgate", "barracuda", "petaltongue"]
+output = "cell-validated"
+
+[nodes.operation]
+name = "health_check"
+
+[nodes.operation.params]
+check_tideglass = true
+check_nestgate = true
+check_barracuda = true
+check_petaltongue = true
+check_rhizocrypt = true
+check_loamspine = true
+check_sweetgrass = true
+health_methods = ["health.liveness", "health.check", "health.readiness"]
+timeout_seconds = 30
+
+[nodes.constraints]
+timeout_ms = 45000

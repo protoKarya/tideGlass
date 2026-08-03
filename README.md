@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+
 # tideGlass
 
 **Cross-spring biological current parser — sovereign drug repurposing platform.**
@@ -8,8 +10,8 @@
 | **Ecosystem** | [ecoPrimals](https://github.com/sporeGarden/ecoPrimals) |
 | **Origin** | GPS Platform — Bin Chen Lab, Michigan State University ([Cell 2026](https://www.cell.com/cell/fulltext/S0092-8674(26)00223-0)) |
 | **Collaborator** | Andrea Gonzales (NF Data Portal) → Bin Chen (PI, offered) |
-| **License** | AGPL-3.0-or-later |
-| **Status** | Phase 0 — Archaeology |
+| **License** | AGPL-3.0-or-later + ORC + CC-BY-SA 4.0 (ScyBorg triple license) |
+| **Status** | Phase 4 — Package |
 | **Generation** | gen5-native (first `protoKarya` project) |
 
 ---
@@ -23,6 +25,10 @@ computational lens that screens, predicts, and optimizes therapeutic compounds.
 
 GPS rebuild is the first lens ground into the glass. The platform will extend to
 NF (neurofibromatosis) drug repurposing as its first novel application.
+
+The as-built system is a pure-Rust workspace: nine crates, a single `tideglass`
+UniBin binary, and a UDS JSON-RPC 2.0 server exposing eleven IPC methods across
+all seven science modules.
 
 **We do not fork. We do not patch. We read the methods as a specification, fetch
 raw data from primary sources, implement from the mathematics, train from scratch,
@@ -53,15 +59,15 @@ accessibility.
 
 ## Seven Science Modules (guideStone)
 
-| Module | Binary | Paper | Claim |
-|--------|--------|-------|-------|
-| RGES correlation | `tideglass-rges` | Chen 2017 (Nat Commun) | RGES correlates with IC50 (r=0.52) |
-| RCL noise cleaning | `tideglass-rcl` | Xing 2026 (Cell) | RCL improves VCAP_t1 signal-to-noise |
-| Expression prediction | `tideglass-gps4drug` | Xing 2026 (Cell) | GPS4Drug predicts expression from structure |
-| Reversal screening | `tideglass-screen` | Xing 2026 (Cell) | ZINC screening recovers known HCC actives |
-| MCTS optimization | `tideglass-molsearch` | Xing 2026 (Cell) | MCTS optimizes HCC lead (IC50 4→0.5 µM) |
-| OCTAD parity | `tideglass-octad` | Zeng 2021 (Nat Protocols) | GPS exceeds OCTAD repurposing for HCC |
-| NF extension | `tideglass-nf` | Novel | GPS reversal scoring for NF1-driven tumors |
+| Module | Crate | Binary | Paper | Claim |
+|--------|-------|--------|-------|-------|
+| RGES correlation | `tideglass-rges` | `tideglass (UniBin)` | Chen 2017 (Nat Commun) | RGES correlates with IC50 (r=0.52) |
+| RCL noise cleaning | `tideglass-rcl` | `tideglass (UniBin)` | Xing 2026 (Cell) | RCL improves VCAP_t1 signal-to-noise |
+| Expression prediction | `tideglass-gps4drug` | `tideglass (UniBin)` | Xing 2026 (Cell) | GPS4Drug predicts expression from structure |
+| Reversal screening | `tideglass-screen` | `tideglass (UniBin)` | Xing 2026 (Cell) | ZINC screening recovers known HCC actives |
+| MCTS optimization | `tideglass-molsearch` | `tideglass (UniBin)` | Xing 2026 (Cell) | MCTS optimizes HCC lead (IC50 4→0.5 µM) |
+| OCTAD parity | `tideglass-octad` | `tideglass (UniBin)` | Zeng 2021 (Nat Protocols) | GPS exceeds OCTAD repurposing for HCC |
+| NF extension | `tideglass-nf` | `tideglass (UniBin)` | Novel | GPS reversal scoring for NF1-driven tumors |
 
 ---
 
@@ -89,13 +95,13 @@ Springs contribute validated science:
 
 ## Phases
 
-| Phase | Scope | Target |
+| Phase | Scope | Status |
 |-------|-------|--------|
-| 0. Archaeology | Download Zenodo artifact, inventory, map dependencies | Week 1-2 |
-| 1. Reproduce | Stand up each module, match published outputs | Week 2-4 |
-| 2. Validate | Cross-validate against primary data sources | Week 4-6 |
-| 3. Rebuild Sovereign | Modern Python → Rust where needed, NestGate data, BLAKE3 provenance | Week 6-12 |
-| 4. Package | pseudoSpore + lithoSpore + NF extension + Bin Chen review | Week 12+ |
+| 0. Archaeology | Download Zenodo artifact, inventory, map dependencies | Complete |
+| 1. Reproduce | Stand up each module, match published outputs | Complete |
+| 2. Validate | Cross-validate against primary data sources | Complete |
+| 3. Rebuild Sovereign | Rust workspace, NestGate data, BLAKE3 provenance | Complete |
+| 4. Package | pseudoSpore + lithoSpore + NF extension + Bin Chen review | **Current** |
 
 ---
 
@@ -114,14 +120,27 @@ Springs contribute validated science:
 ## Building
 
 ```bash
-# Phase 0-2: Python validation (reproducing original)
-pip install -r requirements.txt
-python -m tideglass.validate
-
-# Phase 3+: Rust sovereign modules
 cargo build --release
-./target/release/tideglass validate --all
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -W clippy::pedantic -W clippy::nursery -D warnings
+cargo deny check
+./target/release/tideglass version
+./target/release/tideglass capabilities
+./target/release/tideglass run [--socket <path>]
 ```
+
+---
+
+## Quality
+
+| Metric | Value |
+|--------|-------|
+| Tests | 147 |
+| Region coverage (llvm-cov) | 92.71% |
+| Line coverage (llvm-cov) | 94.11% |
+| Clippy | pedantic + nursery clean |
+| cargo deny | clean |
+| Unsafe code | `#![forbid(unsafe_code)]` on all crates |
 
 ---
 

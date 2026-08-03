@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+
 # shaders/ -- WGSL shaders for barraCuda dispatch
 
 Three shaders planned for GPU-accelerated computation:

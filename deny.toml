@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# cargo-deny configuration — tideGlass dep hygiene.
+# wateringHole Pure Rust standard: zero C dependencies, AGPL workspace.
+
+[graph]
+targets = []
+all-features = true
+
+[advisories]
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "deny"
+unmaintained = "workspace"
+ignore = []
+
+[licenses]
+confidence-threshold = 0.8
+unused-allowed-license = "allow"
+allow = [
+    "AGPL-3.0-or-later",
+    "AGPL-3.0-only",
+    "AGPL-3.0",
+    "MIT",
+    "Apache-2.0",
+    "Unlicense",
+    "Unicode-3.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+]
+
+[licenses.private]
+ignore = true
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+highlight = "all"
+
+# wateringHole Pure Rust standard: ban native C crypto and TLS backends.
+deny = [
+    { crate = "openssl-sys", wrappers = [] },
+    { crate = "openssl", wrappers = [] },
+    { crate = "ring", wrappers = [] },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

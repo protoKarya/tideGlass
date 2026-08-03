@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+
 # tideGlass Data Access Specification
 
 **Gate**: westGate | **Access**: local (no inter-gate mesh needed)

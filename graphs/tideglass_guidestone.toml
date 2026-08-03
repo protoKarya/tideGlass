@@ -1,0 +1,253 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Deploy graph for tideGlass Targeted GuideStone — Tier 3 NUCLEUS composition.
+# Validates seven science modules against GPS platform claims (Cell 2026).
+#
+# Aligned with wateringHole graph envelope:
+# - Dark Forest metadata (secure_by_default, btsp_enforced, uds_only)
+# - by_capability routing on every node
+# - Capability method strings from canonical registry
+#
+# Deploy: biomeos deploy --graph graphs/tideglass_guidestone.toml
+
+[graph]
+name = "tideglass_guidestone"
+id = "tideglass-guidestone-tier3"
+description = "tideGlass Targeted GuideStone — seven-module GPS validation composition"
+version = "0.1.0"
+coordination = "sequential"
+
+[graph.metadata]
+base = "nest_atomic"
+security_model = "btsp_enforced"
+transport = "uds_only"
+secure_by_default = true
+purpose = "scientific_validation"
+tier = 3
+artifact = "tideglass-guidestone"
+gate = "westGate"
+spring = "healthSpring"
+paper = "Xing et al. 2026 — Deep learning-based screening (Cell)"
+paper_doi = "10.1016/j.cell.2026.02.023"
+fragments = ["tower_atomic", "nest_atomic"]
+resolve = true
+
+[graph.bonding_policy]
+type = "covalent"
+shared_seed = true
+
+# ── Phase 0: Trust boundary (Tower Atomic root) ──────────────────────
+
+[[graph.nodes]]
+name = "beardog"
+binary = "beardog"
+source = "plasmidBin"
+order = 0
+required = true
+spawn = false
+by_capability = "crypto"
+capabilities = ["crypto.hash", "crypto.verify", "crypto.sign"]
+health_method = "health.liveness"
+purpose = "BLAKE3 hashing and BTSP verification"
+
+# ── Phase 1: Data + compute primals ──────────────────────────────────
+
+[[graph.nodes]]
+name = "nestgate"
+binary = "nestgate"
+source = "plasmidBin"
+order = 1
+required = true
+depends_on = ["beardog"]
+by_capability = "storage"
+capabilities = ["content.get", "content.put", "storage.store", "storage.retrieve"]
+health_method = "health.liveness"
+purpose = "CAS data fetch — LINCS, ChEMBL, PubChem, ZINC (519 GB westGate federation)"
+
+[[graph.nodes]]
+name = "barracuda"
+binary = "barracuda"
+source = "plasmidBin"
+order = 2
+required = true
+depends_on = ["beardog"]
+by_capability = "tensor"
+capabilities = ["tensor.matmul", "tensor.create", "stats.mean", "linalg.solve"]
+health_method = "health.liveness"
+purpose = "RGES batch scoring, GPS4Drug inference, MCTS evaluation"
+
+[[graph.nodes]]
+name = "petaltongue"
+binary = "petaltongue"
+source = "plasmidBin"
+order = 3
+required = true
+depends_on = ["beardog"]
+by_capability = "visualization"
+capabilities = ["visualization.render", "visualization.render.scene"]
+health_method = "health.liveness"
+purpose = "RGES volcano plots, screening dashboards, MCTS traces"
+
+# ── Phase 2: Provenance trio (Nest Atomic) ───────────────────────────
+
+[[graph.nodes]]
+name = "rhizocrypt"
+binary = "rhizocrypt"
+source = "plasmidBin"
+order = 4
+required = false
+depends_on = ["beardog"]
+by_capability = "dag"
+capabilities = ["dag.session.create", "dag.event.append", "dag.merkle.root"]
+health_method = "health.liveness"
+purpose = "DAG provenance chain per module execution"
+
+[[graph.nodes]]
+name = "loamspine"
+binary = "loamspine"
+source = "plasmidBin"
+order = 5
+required = false
+depends_on = ["beardog", "rhizocrypt"]
+by_capability = "spine"
+capabilities = ["spine.create", "entry.append", "certificate.mint"]
+health_method = "health.liveness"
+purpose = "Certificate chain for validated module outputs"
+
+[[graph.nodes]]
+name = "sweetgrass"
+binary = "sweetgrass"
+source = "plasmidBin"
+order = 6
+required = false
+depends_on = ["beardog", "rhizocrypt", "loamspine"]
+by_capability = "braid"
+capabilities = ["braid.create", "braid.commit", "anchoring.anchor"]
+health_method = "health.liveness"
+purpose = "Attribution braid (Chen 2017, Xing 2026, Zeng 2021, LINCS, ChEMBL, NF Data Portal)"
+
+# ── Phase 3: Seven science modules (UniBin) ──────────────────────────
+
+[[graph.nodes]]
+name = "module1_rges"
+binary = "tideglass"
+source = "workspace"
+order = 10
+required = true
+depends_on = ["nestgate", "barracuda"]
+by_capability = "science"
+capabilities = ["science.rges_screen"]
+health_method = "health.readiness"
+purpose = "Module 1 — RGES correlates with IC50 (Chen 2017, r=0.52)"
+validation_target = "validation/expected/module1_rges.json"
+paper = "Chen 2017 — Nat Commun 8:16022"
+
+[[graph.nodes]]
+name = "module2_rcl"
+binary = "tideglass"
+source = "workspace"
+order = 11
+required = true
+depends_on = ["nestgate"]
+by_capability = "science"
+capabilities = ["science.rcl_select"]
+health_method = "health.readiness"
+purpose = "Module 2 — RCL improves VCAP_t1 signal-to-noise (Xing 2026 Cell)"
+validation_target = "validation/expected/module2_rcl.json"
+paper = "Xing 2026 — Cell (RCL component)"
+
+[[graph.nodes]]
+name = "module3_gps4drug"
+binary = "tideglass"
+source = "workspace"
+order = 12
+required = true
+depends_on = ["nestgate", "barracuda", "module2_rcl"]
+by_capability = "science"
+capabilities = ["science.gps4drug_predict"]
+health_method = "health.readiness"
+purpose = "Module 3 — GPS4Drug predicts expression from structure (Xing 2026 Cell)"
+validation_target = "validation/expected/module3_prediction.json"
+paper = "Xing 2026 — Cell (GPS4Drug component)"
+
+[[graph.nodes]]
+name = "module4_screen"
+binary = "tideglass"
+source = "workspace"
+order = 13
+required = true
+depends_on = ["nestgate", "module3_gps4drug"]
+by_capability = "science"
+capabilities = ["science.compound_screen"]
+health_method = "health.readiness"
+purpose = "Module 4 — ZINC screening recovers known HCC actives (Xing 2026 Cell)"
+validation_target = "validation/expected/module4_screening.json"
+paper = "Xing 2026 — Cell (screening validation)"
+
+[[graph.nodes]]
+name = "module5_molsearch"
+binary = "tideglass"
+source = "workspace"
+order = 14
+required = true
+depends_on = ["nestgate", "barracuda", "module3_gps4drug"]
+by_capability = "science"
+capabilities = ["science.mcts_optimize"]
+health_method = "health.readiness"
+purpose = "Module 5 — MCTS optimizes HCC lead IC50 4 to 0.5 uM (Xing 2026 Cell)"
+validation_target = "validation/expected/module5_mcts.json"
+paper = "Xing 2026 — Cell (MolSearch component)"
+
+[[graph.nodes]]
+name = "module6_octad"
+binary = "tideglass"
+source = "workspace"
+order = 15
+required = true
+depends_on = ["module4_screen"]
+by_capability = "science"
+capabilities = ["science.octad_benchmark"]
+health_method = "health.readiness"
+purpose = "Module 6 — GPS exceeds OCTAD repurposing for HCC (Zeng 2021 Nat Protocols)"
+validation_target = "validation/expected/module6_octad.json"
+paper = "Zeng 2021 — Nat Protocols 16:728-753"
+
+[[graph.nodes]]
+name = "module7_nf"
+binary = "tideglass"
+source = "workspace"
+order = 16
+required = false
+depends_on = ["module4_screen", "nestgate"]
+by_capability = "science"
+capabilities = ["science.nf_score"]
+health_method = "health.readiness"
+purpose = "Module 7 — GPS reversal scoring for NF1-driven tumors (novel extension)"
+validation_target = "validation/expected/module7_nf.json"
+paper = "Novel — first NF application of GPS"
+
+# ── Phase 4: GuideStone validation gate ──────────────────────────────
+
+[[graph.nodes]]
+name = "validate_guidestone"
+binary = "tideglass"
+source = "workspace"
+order = 99
+required = true
+depends_on = [
+    "module1_rges",
+    "module2_rcl",
+    "module3_gps4drug",
+    "module4_screen",
+    "module5_molsearch",
+    "module6_octad",
+]
+
+[graph.nodes.operation]
+name = "validate_all"
+
+[graph.nodes.operation.params]
+targets_file = "data/targets/gps_validation_targets.toml"
+expected_dir = "validation/expected"
+paper = "Xing et al. 2026 Cell"
+timeout_seconds = 3600

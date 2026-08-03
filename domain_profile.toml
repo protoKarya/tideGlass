@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Domain Profile: tideGlass — Drug Repurposing & Pharmacogenomics
 # Gen5 drug repurposing via RGES pipeline, leveraging westGate data federation.
 
@@ -6,55 +7,182 @@ id = "tideglass-drug-repurposing"
 version = "0.1.0"
 domain = "drug-repurposing"
 subdomain = ["rges-pipeline", "pharmacogenomics", "nf-drug-discovery"]
-tools = ["Rust", "barraCuda", "sweetGrass provenance"]
+tools = ["tideglass", "nestGate", "Rust", "barraCuda", "sweetGrass provenance"]
 methods = [
     "reversal-gene-expression-score",
     "gene-set-enrichment",
     "connectivity-mapping",
     "multi-omics-integration",
+    "representative-cell-line-selection",
+    "structure-to-expression-prediction",
+    "compound-library-screening",
+    "mcts-optimization",
+    "octad-benchmark",
+    "network-fragmentation-scoring",
 ]
 
 [translation]
 
 [[translation.entity_groups]]
-name = "rges_pipeline"
-domain_description = "Reversal Gene Expression Score computation for drug repurposing"
+name = "rges_correlation"
+domain_description = "RGES compound screening against a disease signature (Chen 2017)"
 computation = "Disease signature → LINCS L1000 query → enrichment → compound ranking"
-modules = ["rges"]
+modules = ["tideglass-rges"]
+ipc_method = "science.rges_screen"
 
 [[translation.entity_groups]]
-name = "nf_drug_discovery"
-domain_description = "Neurofibromatosis drug repurposing using NF Data Portal + ChEMBL + LINCS"
-computation = "NF expression profiles → RGES → BindingDB affinity filter → candidate prioritization"
-modules = ["nf_pipeline"]
+name = "rcl_noise_cleaning"
+domain_description = "Representative cell line selection and LINCS profile cleaning (Xing 2026)"
+computation = "LINCS profiles → co-training noise scoring → representative cell line ranking"
+modules = ["tideglass-rcl"]
+ipc_method = "science.rcl_select"
+
+[[translation.entity_groups]]
+name = "expression_prediction"
+domain_description = "GPS4Drug structure-to-expression prediction (Xing 2026)"
+computation = "SMILES / molecular features → learned representation → predicted expression profile"
+modules = ["tideglass-gps4drug"]
+ipc_method = "science.gps4drug_predict"
+
+[[translation.entity_groups]]
+name = "reversal_screening"
+domain_description = "Large-scale compound library reversal screening (Xing 2026)"
+computation = "Predicted or observed profiles → RGES filter → ranked reversal hits"
+modules = ["tideglass-screen"]
+ipc_method = "science.compound_screen"
+
+[[translation.entity_groups]]
+name = "mcts_optimization"
+domain_description = "MCTS chemical-space lead optimization (Xing 2026)"
+computation = "Seed compound → tree search over structural neighbors → optimized lead"
+modules = ["tideglass-molsearch"]
+ipc_method = "science.mcts_optimize"
+
+[[translation.entity_groups]]
+name = "octad_parity"
+domain_description = "OCTAD benchmark comparison for HCC repurposing (Zeng 2021)"
+computation = "GPS ranked hits vs OCTAD baseline → enrichment and recall metrics"
+modules = ["tideglass-octad"]
+ipc_method = "science.octad_benchmark"
+
+[[translation.entity_groups]]
+name = "nf_extension"
+domain_description = "Network fragmentation scoring for NF1-driven tumors (novel extension)"
+computation = "NF disease signatures → tissue-aware scoring → candidate prioritization"
+modules = ["tideglass-nf"]
+ipc_method = "science.nf_score"
 
 [derivation]
 
 [[derivation.pipeline]]
 name = "rges_screen"
-description = "Full RGES screen against LINCS L1000 perturbation database"
+description = "RGES compound screening against LINCS L1000 perturbation database"
 input = "Disease expression profile (GEO/TCGA)"
 output = "Ranked compound list with reversal scores and provenance braid"
-tool = "tideGlass rges module (CPU + barraCuda for large matrices)"
+tool = "tideglass"
+ipc_method = "science.rges_screen"
+
+[[derivation.pipeline]]
+name = "rcl_select"
+description = "Representative cell line selection for perturbation matching"
+input = "LINCS L1000 cell-line expression profiles"
+output = "Ranked cell lines with noise scores"
+tool = "tideglass"
+ipc_method = "science.rcl_select"
+
+[[derivation.pipeline]]
+name = "gps4drug_predict"
+description = "Structure-to-expression prediction via GPS4Drug"
+input = "SMILES or molecular feature vector"
+output = "Predicted perturbation expression profile"
+tool = "tideglass"
+ipc_method = "science.gps4drug_predict"
+
+[[derivation.pipeline]]
+name = "compound_screen"
+description = "Large-scale compound library reversal screening"
+input = "Disease signature and compound library"
+output = "Filtered and ranked reversal hits"
+tool = "tideglass"
+ipc_method = "science.compound_screen"
+
+[[derivation.pipeline]]
+name = "mcts_optimize"
+description = "MCTS-based combination and lead optimization"
+input = "Seed compound and search space"
+output = "Optimized lead compounds with scores"
+tool = "tideglass"
+ipc_method = "science.mcts_optimize"
+
+[[derivation.pipeline]]
+name = "octad_benchmark"
+description = "OCTAD parity benchmark for repurposing claims"
+input = "GPS ranked hits and OCTAD baseline"
+output = "Benchmark metrics (enrichment, recall, rank comparison)"
+tool = "tideglass"
+ipc_method = "science.octad_benchmark"
+
+[[derivation.pipeline]]
+name = "nf_score"
+description = "Network fragmentation scoring for NF extension"
+input = "NF disease signatures and tissue context"
+output = "Ranked NF drug candidates with fragmentation scores"
+tool = "tideglass"
+ipc_method = "science.nf_score"
 
 [audit]
 
 [[audit.checks]]
 name = "rges_reference_parity"
 description = "RGES scores match GPS4Drug reference within tolerance"
-applies_to = ["rges"]
+applies_to = ["tideglass-rges"]
+
+[[audit.checks]]
+name = "rcl_signal_improvement"
+description = "RCL cleaning improves signal-to-noise vs raw LINCS profiles"
+applies_to = ["tideglass-rcl"]
+
+[[audit.checks]]
+name = "gps4drug_prediction_accuracy"
+description = "Held-out expression prediction meets published R² threshold"
+applies_to = ["tideglass-gps4drug"]
+
+[[audit.checks]]
+name = "screen_enrichment_auc"
+description = "Compound screening recovers known actives above enrichment AUC threshold"
+applies_to = ["tideglass-screen"]
+
+[[audit.checks]]
+name = "mcts_lead_optimization"
+description = "MCTS search improves lead IC50 while maintaining selectivity"
+applies_to = ["tideglass-molsearch"]
+
+[[audit.checks]]
+name = "octad_benchmark_parity"
+description = "GPS screening exceeds OCTAD repurposing baseline on HCC targets"
+applies_to = ["tideglass-octad"]
+
+[[audit.checks]]
+name = "nf_scoring_validity"
+description = "NF fragmentation scores rank known NF actives above random baseline"
+applies_to = ["tideglass-nf"]
 
 [[audit.checks]]
 name = "provenance_completeness"
 description = "All pipeline outputs have BLAKE3 hashes and DAG session provenance"
 applies_to = "all"
 
+[[audit.checks]]
+name = "ipc_method_registry"
+description = "Each module exposes its canonical JSON-RPC method via tideglass UniBin"
+applies_to = ["tideglass-bin"]
+
 [figures]
 auto_generate = false
 
 [[figures.plot]]
 name = "rges_volcano"
-module = "rges"
+module = "tideglass-rges"
 type = "scatter"
 x_axis = "RGES score"
 y_axis = "-log10(p-value)"

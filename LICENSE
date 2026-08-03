@@ -1,3 +1,60 @@
+SPDX-License-Identifier: AGPL-3.0-or-later
+
+tideGlass — scyBorg Triple-License Notice
+==========================================
+
+Copyright (c) 2026 protoKarya
+
+This project is part of the ecoPrimals ecosystem and follows the scyBorg
+triple-copyleft licensing model. Different parts of the repository are
+governed by different licenses:
+
+1. Source Code (Rust, build scripts, tooling configs)
+   License: GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
+   Applies to: all `.rs` files, `Cargo.toml`, CI configs, deploy graphs,
+   and other executable or compilable artifacts.
+   Full text: see "GNU AFFERO GENERAL PUBLIC LICENSE" section below.
+
+2. Game Mechanics and Rules (if any)
+   License: Open RPG Creative License (ORC)
+   Applies to: reproducible mechanical interactions, scoring rules, pipeline
+   mechanics, and game-rule engines when codified as standalone rule systems.
+   ORC License: https://azoralaw.com/orclicense/
+   See also: LICENSE-ORC (when present)
+
+3. Creative Works and Documentation
+   License: Creative Commons Attribution-ShareAlike 4.0 International (CC-BY-SA-4.0)
+   Applies to: README, specs, diagrams, notebooks, validation narratives,
+   and other non-code creative or documentary material.
+   Full text: https://creativecommons.org/licenses/by-sa/4.0/legalcode
+   See also: LICENSE-CC-BY-SA (when present)
+
+Reserved Names
+--------------
+
+The following are expressly reserved and NOT licensed under ORC or CC-BY-SA
+for use as project or product identities:
+
+  - "tideGlass" name and identity
+  - "protoKarya" name and identity
+  - "ecoPrimals" name and logo
+  - "scyBorg" name and framework identity
+  - All primal names (bearDog, nestGate, barraCuda, petalTongue, etc.)
+  - All spring names (healthSpring, wetSpring, neuralSpring, hotSpring, etc.)
+
+Attribution
+-----------
+
+When redistributing ORC or CC-BY-SA material from this project, include:
+
+  tideGlass — protoKarya / ecoPrimals
+  Copyright (c) 2026 protoKarya
+  Licensed under AGPL-3.0-or-later (code), ORC (mechanics), CC-BY-SA-4.0 (creative)
+
+No telemetry, tracking, or surveillance code is permitted in this codebase.
+
+---
+
 GNU AFFERO GENERAL PUBLIC LICENSE
 Version 3, 19 November 2007
 
@@ -15,3 +72,6 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For the complete AGPL-3.0 text, see:
+https://www.gnu.org/licenses/agpl-3.0.txt

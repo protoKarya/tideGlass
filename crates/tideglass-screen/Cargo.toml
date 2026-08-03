@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+[package]
+name = "tideglass-screen"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "tideGlass Screen — compound library screening with Lipinski and RGES filters"
+
+[dependencies]
+tideglass-core = { workspace = true }
+tideglass-gps4drug = { path = "../tideglass-gps4drug" }
+tideglass-rges = { path = "../tideglass-rges" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }

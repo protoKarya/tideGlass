@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+
 # artifact/ -- guideStone data and expected outputs
 
 Data files are NOT committed to git. Fetch from primary sources:

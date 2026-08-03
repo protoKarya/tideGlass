@@ -4,8 +4,7 @@
 # Declares which ecosystem components contribute to this artifact.
 #
 # Pattern source: lithoSpore/artifact/scope.toml (LTEE instance)
-# This is a DRAFT for ecosystem review. Module details will sharpen
-# during Phase 0 archaeology as GPS code is inventoried.
+# Version 0.1.0 — as-built UniBin composition (Phase 4).
 
 [guidestone]
 name = "tideglass-guidestone"
@@ -71,14 +70,15 @@ papers = ["Anderson analogy", "Xing2026 (tissue extension)"]
 
 # --- Seven Science Modules ---
 # Each module validates a specific claim from the paper chain.
-# Binary names follow lithoSpore convention: project-module.
+# All modules dispatch through the tideglass UniBin binary.
 
 [[module]]
 name = "rges_correlation"
-binary = "tideglass-rges"
-data_dir = "artifact/data/chen_2017_rges"
-expected = "validation/expected/module1_rges.json"
-tier1_notebook = "notebooks/module1_rges/rges_correlation.py"
+binary = "tideglass"
+ipc_method = "science.rges_screen"
+data_dir = "artifact/data/chen_2017_rges"  # pending — CAS ingest not yet wired
+expected = "validation/expected/module1_rges.json"  # pending — fixture milestone
+tier1_notebook = "notebooks/module1_rges/rges_correlation.py"  # pending — Python parity deferred
 paper = "Chen 2017 — Reversal of cancer gene expression (Nat Commun 8:16022)"
 doi = "10.1038/ncomms16022"
 claim = "RGES correlates with IC50 (r=0.52, P=2.3e-3 in MCF7)"
@@ -86,10 +86,11 @@ depends_on = []
 
 [[module]]
 name = "rcl_noise_cleaning"
-binary = "tideglass-rcl"
-data_dir = "artifact/data/lincs_vcap_t1"
-expected = "validation/expected/module2_rcl.json"
-tier1_notebook = "notebooks/module2_rcl/rcl_vcap_cleaning.py"
+binary = "tideglass"
+ipc_method = "science.rcl_select"
+data_dir = "artifact/data/lincs_vcap_t1"  # pending — CAS ingest not yet wired
+expected = "validation/expected/module2_rcl.json"  # pending — fixture milestone
+tier1_notebook = "notebooks/module2_rcl/rcl_vcap_cleaning.py"  # pending — Python parity deferred
 paper = "Xing 2026 — GPS (Cell, RCL component)"
 doi = "10.1016/j.cell.2026.02.023"
 claim = "RCL improves VCAP_t1 profile signal-to-noise vs raw LINCS"
@@ -97,10 +98,11 @@ depends_on = []
 
 [[module]]
 name = "expression_prediction"
-binary = "tideglass-gps4drug"
-data_dir = "artifact/data/gps4drug_heldout"
-expected = "validation/expected/module3_prediction.json"
-tier1_notebook = "notebooks/module3_prediction/gps4drug_heldout.py"
+binary = "tideglass"
+ipc_method = "science.gps4drug_predict"
+data_dir = "artifact/data/gps4drug_heldout"  # pending — CAS ingest not yet wired
+expected = "validation/expected/module3_prediction.json"  # pending — fixture milestone
+tier1_notebook = "notebooks/module3_prediction/gps4drug_heldout.py"  # pending — Python parity deferred
 paper = "Xing 2026 — GPS (Cell, GPS4Drug component)"
 doi = "10.1016/j.cell.2026.02.023"
 claim = "GPS4Drug predicts expression from structure (R² on held-out test set)"
@@ -108,10 +110,11 @@ depends_on = ["rcl_noise_cleaning"]
 
 [[module]]
 name = "reversal_screening"
-binary = "tideglass-screen"
-data_dir = "artifact/data/zinc_hcc_screen"
-expected = "validation/expected/module4_screening.json"
-tier1_notebook = "notebooks/module4_screening/zinc_reversal_screen.py"
+binary = "tideglass"
+ipc_method = "science.compound_screen"
+data_dir = "artifact/data/zinc_hcc_screen"  # pending — CAS ingest not yet wired
+expected = "validation/expected/module4_screening.json"  # pending — fixture milestone
+tier1_notebook = "notebooks/module4_screening/zinc_reversal_screen.py"  # pending — Python parity deferred
 paper = "Xing 2026 — GPS (Cell, screening validation)"
 doi = "10.1016/j.cell.2026.02.023"
 claim = "ZINC screening recovers known HCC actives (enrichment AUC)"
@@ -119,10 +122,11 @@ depends_on = ["expression_prediction"]
 
 [[module]]
 name = "mcts_optimization"
-binary = "tideglass-molsearch"
-data_dir = "artifact/data/molsearch_hcc"
-expected = "validation/expected/module5_mcts.json"
-tier1_notebook = "notebooks/module5_mcts/molsearch_hcc_lead.py"
+binary = "tideglass"
+ipc_method = "science.mcts_optimize"
+data_dir = "artifact/data/molsearch_hcc"  # pending — CAS ingest not yet wired
+expected = "validation/expected/module5_mcts.json"  # pending — fixture milestone
+tier1_notebook = "notebooks/module5_mcts/molsearch_hcc_lead.py"  # pending — Python parity deferred
 paper = "Xing 2026 — GPS (Cell, MolSearch component)"
 doi = "10.1016/j.cell.2026.02.023"
 claim = "MCTS optimizes HCC lead: IC50 4uM to 0.5uM, selectivity maintained"
@@ -130,10 +134,11 @@ depends_on = ["expression_prediction"]
 
 [[module]]
 name = "octad_parity"
-binary = "tideglass-octad"
-data_dir = "artifact/data/octad_hcc_baseline"
-expected = "validation/expected/module6_octad.json"
-tier1_notebook = "notebooks/module6_octad/octad_parity.py"
+binary = "tideglass"
+ipc_method = "science.octad_benchmark"
+data_dir = "artifact/data/octad_hcc_baseline"  # pending — CAS ingest not yet wired
+expected = "validation/expected/module6_octad.json"  # pending — fixture milestone
+tier1_notebook = "notebooks/module6_octad/octad_parity.py"  # pending — Python parity deferred
 paper = "Zeng 2021 — OCTAD (Nat Protocols 16:728-753)"
 doi = "10.1038/s41596-020-00430-z"
 claim = "GPS screening exceeds OCTAD repurposing for HCC targets"
@@ -141,10 +146,11 @@ depends_on = ["reversal_screening"]
 
 [[module]]
 name = "nf_extension"
-binary = "tideglass-nf"
-data_dir = "artifact/data/nf_disease_signatures"
-expected = "validation/expected/module7_nf.json"
-tier1_notebook = "notebooks/module7_nf/nf_reversal_screen.py"
+binary = "tideglass"
+ipc_method = "science.nf_score"
+data_dir = "artifact/data/nf_disease_signatures"  # pending — CAS ingest not yet wired
+expected = "validation/expected/module7_nf.json"  # pending — fixture milestone
+tier1_notebook = "notebooks/module7_nf/nf_reversal_screen.py"  # pending — Python parity deferred
 paper = "Novel (no prior publication — first NF application of GPS)"
 doi = ""
 claim = "GPS reversal scoring identifies candidates for NF1-driven tumors"
@@ -210,12 +216,12 @@ notes = "Model weight provenance chain — novel category for ML artifacts"
 # --- Source Metadata ---
 
 [source]
-repo = "git@github.com:protoKarya/tideGlass.git"
-repo_https = "https://github.com/protoKarya/tideGlass.git"
+repo = "git@git.primals.eco:ecoPrimals/tideGlass.git"
+repo_https = "https://git.primals.eco/ecoPrimals/tideGlass.git"
 branch = "main"
 ecosystem_repo = "git@github.com:sporeGarden/ecoPrimals.git"
 ecosystem_repo_https = "https://github.com/sporeGarden/ecoPrimals.git"
 rust_toolchain = "stable"
 rust_target = "x86_64-unknown-linux-musl"
-containerfile = "Containerfile"
+containerfile = ""
 license = "AGPL-3.0-or-later"

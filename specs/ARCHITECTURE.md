@@ -1,6 +1,8 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+
 # tideGlass Architecture
 
-**Version**: 0.1.0 | **Phase**: 0 (Archaeology → Reproduction) | **Gate**: westGate
+**Version**: 0.1.0 | **Phase**: 4 (Package) | **Gate**: westGate
 
 ---
 
@@ -15,16 +17,18 @@ tideGlass is a **protist** — an application composed *from* primals, not a pri
 ## Workspace Layout
 
 ```
-protists/tideGlass/
+gardens/tideGlass/
 ├── Cargo.toml              # workspace root (edition 2024)
 ├── crates/
-│   ├── tideglass-core/     # shared types, RGES scorer, data access
-│   ├── tideglass-rcl/      # RCL noise cleaning (Phase 1)
-│   ├── tideglass-gps4drug/ # Structure → expression prediction (Phase 1)
-│   ├── tideglass-screen/   # Reversal screening (Phase 1)
-│   ├── tideglass-molsearch/ # MCTS compound optimization (Phase 2)
-│   ├── tideglass-octad/    # OCTAD parity validation (Phase 2)
-│   └── tideglass-nf/       # NF extension — novel application (Phase 3)
+│   ├── tideglass-core/     # Shared types, enrichment, error handling, IPC, discovery
+│   ├── tideglass-bin/      # UniBin binary: UDS server, dispatch, health, CLI
+│   ├── tideglass-rges/     # RGES pipeline + BH-FDR screening
+│   ├── tideglass-rcl/      # Representative cell line SNR ranking
+│   ├── tideglass-gps4drug/ # Structure-to-expression prediction
+│   ├── tideglass-screen/   # Compound library + Lipinski/structural alert filters
+│   ├── tideglass-molsearch/# MCTS molecular optimization
+│   ├── tideglass-octad/    # Benchmark evaluation metrics
+│   └── tideglass-nf/       # NF1 tissue-weighted reversal scoring
 ├── validation/             # Python reproduction of published claims
 │   ├── notebooks/          # Tier 1 Python notebooks per module
 │   └── expected/           # guideStone expected outputs
@@ -98,41 +102,65 @@ biomeos deploy --graph graphs/cells/tideglass_cell.toml
 
 The cell graph (`tideglass_cell.toml`) defines:
 - Full NUCLEUS base (13 primals)
-- tideGlass domain node (order 12) with `science.rges_screen`, `science.gene_set_enrichment`, `data.fetch` capabilities
+- tideGlass domain node (order 12) with all seven `science.*` IPC methods
 - petalTongue in live mode for visualization
 - All data access via local westGate CAS (`content.get` / `content.put`)
 
 ---
 
-## IPC Methods (planned)
+## Binary Model (UniBin)
+
+tideGlass ships as a single **`tideglass` binary** (`tideglass-bin`). There are no per-module executables. All science modules compile as library crates linked into the UniBin.
+
+The binary listens on a Unix domain socket (default: `/run/tideglass/tideglass.sock`) and accepts NDJSON-framed JSON-RPC 2.0 requests. A central dispatch router in `tideglass-bin/src/dispatch.rs` matches each request's `method` field to the appropriate library crate handler. Health and capability discovery endpoints are served from the same process.
+
+CLI subcommands (`capabilities`, `health`, `serve`) support local inspection and orchestrator integration without starting the full UDS server.
+
+---
+
+## IPC Methods (implemented)
 
 tideGlass exposes its own JSON-RPC methods via UDS:
 
-| Method | Description | Phase |
-|--------|-------------|-------|
-| `science.rges_screen` | Full RGES screen against LINCS L1000 | Phase 1 |
-| `science.gene_set_enrichment` | Gene set enrichment analysis | Phase 1 |
-| `science.rcl_clean` | RCL noise cleaning on expression profiles | Phase 1 |
-| `science.gps4drug_predict` | Structure → expression prediction | Phase 1 |
-| `science.reversal_screen` | Reversal screening against compound library | Phase 1 |
-| `science.mcts_optimize` | MCTS compound optimization | Phase 2 |
-| `science.octad_compare` | OCTAD parity benchmark | Phase 2 |
-| `science.nf_screen` | NF1-driven tumor reversal screen | Phase 3 |
-| `data.fetch` | Fetch data from westGate CAS by content hash | Phase 1 |
-| `health.liveness` | Standard primal health probe | Phase 1 |
-| `health.readiness` | Module readiness (which modules are operational) | Phase 1 |
+| Method | Module | Description |
+|--------|--------|-------------|
+| `capabilities.list` | core | List all tideGlass JSON-RPC methods |
+| `health.liveness` | bin | Liveness probe |
+| `health.check` | bin | Health check with component status |
+| `health.readiness` | bin | Readiness probe |
+| `science.rges_screen` | rges | RGES compound screening against disease signature |
+| `science.rcl_select` | rcl | Representative cell line selection |
+| `science.gps4drug_predict` | gps4drug | Structure-to-expression prediction |
+| `science.compound_screen` | screen | Compound library screening with filters |
+| `science.mcts_optimize` | molsearch | MCTS-based molecular optimization |
+| `science.octad_benchmark` | octad | OCTAD benchmark evaluation |
+| `science.nf_score` | nf | NF1 tissue-weighted reversal scoring |
 
 ---
 
 ## Build & Test
 
 ```bash
-# Build all crates
-cargo build --workspace
-
-# Run tests
+cargo build --release
 cargo test --workspace
+cargo clippy --workspace --all-targets -- -W clippy::pedantic -W clippy::nursery -D warnings
+cargo deny check
+cargo llvm-cov --workspace --all-features  # 92.71% regions, 94.11% lines
+```
 
-# Run with NUCLEUS (on westGate)
+Deploy on westGate:
+
+```bash
 biomeos deploy --graph graphs/cells/tideglass_cell.toml
 ```
+
+---
+
+## Quality Metrics
+
+| Metric | Value |
+|--------|-------|
+| Tests | 147 (`cargo test --workspace`) |
+| Coverage | 92.71% regions, 94.11% lines (`cargo llvm-cov --workspace --all-features`) |
+| Unsafe code | `#![forbid(unsafe_code)]` on all workspace crates |
+| Dependencies | Pure Rust — no C bindings or FFI in the workspace |

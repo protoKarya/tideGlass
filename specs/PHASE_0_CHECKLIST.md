@@ -1,4 +1,10 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+
 # tideGlass Phase 0 — Archaeology Checklist
+
+> **Archived.** Phase 0 archaeology is complete. Rust workspace fully implements
+> all seven science modules. See specs/ARCHITECTURE.md for the as-built system.
+> Python validation parity is deferred to a future phase.
 
 **Goal**: Inventory the GPS platform, download all data from primary sources, reproduce Module 1 (RGES) in Python, validate against Chen 2017 published results.
 
@@ -72,10 +78,10 @@ Reproduce Chen 2017 Table 1 results using raw primary data (not Zenodo preproces
 
 ### 3c. RGES Computation
 
-- [ ] Implement weighted Kolmogorov-Smirnov enrichment (not simple overlap)
-- [ ] Compute RGES for each compound against HCC disease signature
-- [ ] Implement permutation test for p-values (10,000 permutations)
-- [ ] Rank compounds by RGES
+- [x] Implement weighted Kolmogorov-Smirnov enrichment (not simple overlap) — Rust: `tideglass-core/src/enrichment.rs`
+- [x] Compute RGES for each compound against HCC disease signature — Rust: `compute_rges`
+- [x] Implement permutation test for p-values (10,000 permutations) — Rust: `permutation_p_value`
+- [x] Rank compounds by RGES — Rust: `tideglass-rges/src/screen.rs`
 
 ### 3d. Validation
 
@@ -95,14 +101,14 @@ Reproduce Chen 2017 Table 1 results using raw primary data (not Zenodo preproces
 
 ## Step 4: Rust Scaffold
 
-Once Python reproduction validates, set up the Rust crate structure.
+Rust workspace implements all seven science modules plus UniBin (`tideglass-bin`).
 
-- [ ] Create `crates/tideglass-rges/Cargo.toml`
-- [ ] Add to workspace members in root `Cargo.toml`
-- [ ] Implement `DiseaseSignature`, `PerturbationSignature`, `RgesResult` types (already in `tideglass-core`)
+- [x] Create `crates/tideglass-rges/Cargo.toml`
+- [x] Add to workspace members in root `Cargo.toml`
+- [x] Implement `DiseaseSignature`, `PerturbationSignature`, `RgesResult` types (in `tideglass-core`)
 - [ ] Wire nestGate CAS client for data access
-- [ ] Wire IPC handler for `science.rges_screen`
-- [ ] Port RGES computation from Python to Rust
+- [x] Wire IPC handler for `science.rges_screen` (via `tideglass-bin` UniBin dispatch)
+- [x] Port RGES computation from Python to Rust
 - [ ] Add tests comparing Rust output to Python expected output
 
 ---

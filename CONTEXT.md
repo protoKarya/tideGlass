@@ -27,8 +27,8 @@ the ecosystem would not have discovered organically.
 
 ## Architecture
 
-- **validation/** — Python-first reproduction of published claims (Phase 0-2)
-- **crates/** — Rust sovereign modules (Phase 3+)
+- **crates/** — Rust workspace (9 crates, complete)
+  - `tideglass-core` — shared types, enrichment, IPC, discovery
   - `tideglass-rges` — RGES batch scoring
   - `tideglass-rcl` — RCL noise cleaning
   - `tideglass-gps4drug` — Structure → expression prediction
@@ -36,24 +36,42 @@ the ecosystem would not have discovered organically.
   - `tideglass-molsearch` — MCTS compound optimization
   - `tideglass-octad` — OCTAD parity validation
   - `tideglass-nf` — NF extension (novel application)
+  - `tideglass-bin` — UniBin server (`run`, `version`, `capabilities`, `help`)
 - **artifact/** — guideStone-format data and expected outputs
-- **notebooks/** — Tier 1 Python notebooks per module
 - **graphs/** — Deploy graph TOMLs for NUCLEUS composition
 - **shaders/** — WGSL shaders for barraCuda dispatch
+- **validation/** — deferred Python reproduction scaffold (future)
+
+## IPC Methods
+
+The `tideglass` UniBin serves UDS JSON-RPC 2.0 over NDJSON framing. Eleven
+methods are implemented:
+
+| Domain | Methods |
+|--------|---------|
+| Capabilities | `capabilities.list` |
+| Health | `health.liveness`, `health.check`, `health.readiness` |
+| Science | `science.rges_screen`, `science.rcl_select`, `science.gps4drug_predict`, `science.compound_screen`, `science.mcts_optimize`, `science.octad_benchmark`, `science.nf_score` |
 
 ## Key Data
 
+- westGate CAS federation — 519 GB local science data (13 datasets in tideGlass domain)
 - LINCS L1000 Level 5 — 1.3M drug perturbation profiles (primary source)
 - ChEMBL — bioactivity panels (JAK, kinase selectivity)
 - ZINC — screened compound library (750M+ structures)
 - NF Data Portal — NF1-driven tumor transcriptomic signatures (novel extension)
 
+CAS data loading via nestGate is a Phase 4 integration target — not yet wired
+into the running server.
+
 ## Dependencies
 
-Phase 0-2: Python stack (reproducing original GPS codebase)
-Phase 3+: Rust + ecoPrimals primals (NUCLEUS composition)
+Rust workspace is complete (serde, serde_json, thiserror, rand, tokio).
+Python validation is deferred to a future phase. Phase 4 integrates nestGate
+CAS fetch, pseudoSpore packaging, and collaborator delivery.
 
 ## Status
 
-Phase 0 — Archaeology. Inventorying the 713 MB Zenodo artifact, mapping
-dependency graph, tracing data lineages from primary sources.
+Phase 4 — Package. Rust workspace rebuilt and tested (147 tests, 92.71%
+coverage). Current work: nestGate data integration, pseudoSpore + lithoSpore
+packaging, NF extension validation, Bin Chen review gate.

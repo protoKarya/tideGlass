@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+
 # graphs/ -- Deploy graph TOMLs for NUCLEUS composition
 
 Deploy graphs define how tideGlass modules compose with primals.

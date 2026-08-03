@@ -1,6 +1,8 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+
 # tideGlass Module Specifications
 
-**Version**: 0.1.0 | **Standard**: TARGETED_GUIDESTONE_STANDARD v1.0
+**Version**: 0.1.0 — As-Built | **Standard**: TARGETED_GUIDESTONE_STANDARD v1.0
 
 Each module validates a specific claim from the GPS paper chain. Modules are ordered by dependency — Module 1 (RGES) is the foundation, Modules 2-4 build on it, and Modules 5-7 extend.
 
@@ -44,11 +46,12 @@ Reproduce Table 1 from Chen 2017: RGES correlation with IC50 for 15 HCC compound
 
 ### Implementation notes
 
-- `tideglass-core/src/rges.rs` has the scaffold (types + naive `compute_rges`)
-- Permutation test (`p_value`) is currently stubbed — needs proper implementation
-- Gene set enrichment currently uses simple overlap ratio — should implement weighted Kolmogorov-Smirnov (GSEA standard)
-- barraCuda dispatch for large LINCS matrix operations (1.3M profiles × ~1000 landmark genes)
-- Provenance: each RGES screen creates a rhizoCrypt DAG session
+- Weighted Kolmogorov–Smirnov enrichment lives in `tideglass-core/src/enrichment.rs` (`weighted_ks_enrichment`, `compute_rges`, permutation p-values)
+- Benjamini–Hochberg FDR correction and hit ranking in `tideglass-rges/src/screen.rs`
+- End-to-end orchestration in `tideglass-rges/src/pipeline.rs` (`RgesPipeline::run`)
+- IPC handler: `science.rges_screen` via UniBin dispatch
+- barraCuda dispatch for large LINCS matrix operations remains a future integration point
+- Provenance: each RGES screen creates a rhizoCrypt DAG session (planned NUCLEUS wiring)
 
 ### Crate structure
 
@@ -56,38 +59,32 @@ Reproduce Table 1 from Chen 2017: RGES correlation with IC50 for 15 HCC compound
 crates/tideglass-rges/
 ├── Cargo.toml
 └── src/
-    ├── lib.rs          # module entry, IPC handlers
-    ├── scorer.rs       # RGES computation (KS enrichment)
-    ├── lincs.rs        # LINCS L1000 GCTx parser
-    ├── disease.rs      # disease signature extraction (GEO/TCGA)
-    ├── permutation.rs  # permutation test for p-values
-    └── ranking.rs      # compound ranking + output formatting
+    ├── lib.rs          # module entry, re-exports
+    ├── pipeline.rs     # RgesPipeline orchestration
+    └── screen.rs       # BH-FDR correction + ranked hit output
 ```
 
 ---
 
-## Module 2: RCL Noise Cleaning (`tideglass-rcl`)
+## Module 2: Representative Cell Line Selection (`tideglass-rcl`)
 
 **Paper**: Xing 2026 — "Deep learning-based screening and design of novel therapeutics." *Cell*
 **DOI**: 10.1016/j.cell.2026.02.023
 **Claim**: RCL improves VCAP_t1 profile signal-to-noise vs raw LINCS
-**Dependencies**: None (parallel to Module 1)
+**Dependencies**: Module 1 (RGES scoring for per-compound evaluation)
 
 ### What it does
 
-Robust Collaborative Learning (RCL) cleans noisy drug-induced gene expression profiles. LINCS L1000 data has biological and technical noise — RCL uses multi-network co-training with fuzzy membership and forget-rate scheduling to learn clean signal from noisy replicates.
+Selects the most representative cell line for a disease signature by ranking LINCS cell lines on signal-to-noise ratio (SNR) of absolute RGES across compounds. Higher SNR indicates a cell line where reversal signal is consistent and distinguishable from noise — the line best suited for downstream perturbation matching.
 
 ### Pipeline
 
 ```
-1. Load LINCS L1000 profiles for target cell line (e.g., VCAP_t1)
-2. Initialize N teacher networks with different random seeds
-3. Co-training loop:
-   a. Each teacher scores samples by prediction confidence
-   b. Fuzzy membership weights low-confidence samples down
-   c. Forget-rate scheduler progressively excludes noisy samples
-   d. Student network trains on consensus-weighted data
-4. Output: cleaned expression profiles with noise scores per sample
+1. Group perturbation signatures by cell line
+2. For each cell line, compute RGES for every compound (Module 1 enrichment)
+3. Compute mean(|RGES|) and std(|RGES|) per cell line
+4. SNR = mean(|RGES|) / std(|RGES|)
+5. Rank cell lines by SNR; return top representative line(s)
 ```
 
 ### Data requirements
@@ -103,11 +100,11 @@ Compare cleaned vs raw VCAP_t1 profiles. Signal-to-noise ratio must improve by �
 
 ### Implementation notes
 
-- This is the most ML-heavy module — needs a training loop
-- Phase 0-2: reproduce in Python with PyTorch (GPS used PyTorch)
-- Phase 3: Rust implementation via barraCuda tensor ops + toadStool GPU dispatch
-- neuralSpring provides multi-network architecture patterns
-- Model weights get loamSpine certificate chain for verification
+- SNR-based cell line ranking in `tideglass-rcl/src/selection.rs` (`rank_cell_lines`, `group_by_cell_line`)
+- Uses core RGES enrichment — not deep-learning noise cleaning
+- Configurable minimum compounds per line (`RclConfig::min_compounds_per_line`)
+- IPC handler: `science.rcl_select` via UniBin dispatch
+- Deep-learning RCL reproduction (PyTorch multi-network co-training) remains a future validation track
 
 ### Crate structure
 
@@ -115,12 +112,8 @@ Compare cleaned vs raw VCAP_t1 profiles. Signal-to-noise ratio must improve by �
 crates/tideglass-rcl/
 ├── Cargo.toml
 └── src/
-    ├── lib.rs          # module entry
-    ├── teacher.rs      # teacher network definition
-    ├── student.rs      # student network (consensus learner)
-    ├── membership.rs   # fuzzy membership computation
-    ├── scheduler.rs    # forget-rate scheduling
-    └── evaluate.rs     # signal-to-noise evaluation
+    ├── lib.rs          # module entry, re-exports
+    └── selection.rs    # SNR ranking + cell line grouping
 ```
 
 ---
@@ -130,7 +123,7 @@ crates/tideglass-rcl/
 **Paper**: Xing 2026 (*Cell*, GPS4Drug component)
 **DOI**: 10.1016/j.cell.2026.02.023
 **Claim**: GPS4Drug predicts expression from structure (R² on held-out test set)
-**Dependencies**: Module 2 (RCL-cleaned profiles for training data)
+**Dependencies**: Module 1 (RGES for validation); training data may use RCL-selected cell lines
 
 ### What it does
 
@@ -139,23 +132,31 @@ Given a chemical structure (SMILES string), predicts the induced gene expression
 ### Pipeline
 
 ```
-1. Encode compound SMILES → learned molecular representation
-2. Feed representation through GPS4Drug predictor network
+1. Encode compound SMILES → molecular features (physicochemical descriptors + fingerprint)
+2. Linear regression predictor: y = intercept + W · x
 3. Output: predicted expression changes (landmark gene vector)
-4. Compare predicted vs RCL-cleaned observed profiles (validation)
+4. Compare predicted vs observed profiles (validation)
 ```
 
 ### Data requirements
 
 | Source | Size | Format |
 |--------|------|--------|
-| RCL-cleaned LINCS profiles | Output from Module 2 | Internal |
+| LINCS perturbation profiles | 20 GB | GCTx (HDF5) |
 | ChEMBL 37 (compound structures) | 15 GB | SMILES/SDF |
-| GPS Platform model weights (Zenodo) | ~500 MB | PyTorch |
+| GPS Platform model weights (Zenodo) | ~500 MB | PyTorch (reference) |
 
 ### Validation target
 
 R² ≥ 0.75 on held-out test set (per published figure). Profile-level Pearson correlation ≥ 0.65.
+
+### Implementation notes
+
+- Linear regression predictor in `tideglass-gps4drug/src/prediction.rs` (`LinearRegressionPredictor`, `ExpressionPredictor` trait)
+- Molecular feature extraction in `tideglass-gps4drug/src/features.rs` (`MolecularFeatures`, physicochemical descriptors)
+- Not a deep-learning model — multivariate linear regression from hand-crafted features
+- IPC handler: `science.gps4drug_predict` via UniBin dispatch
+- Deep-learning GPS4Drug reproduction remains a future validation track
 
 ### Crate structure
 
@@ -163,11 +164,9 @@ R² ≥ 0.75 on held-out test set (per published figure). Profile-level Pearson 
 crates/tideglass-gps4drug/
 ├── Cargo.toml
 └── src/
-    ├── lib.rs          # module entry
-    ├── encoder.rs      # SMILES → molecular representation
-    ├── predictor.rs    # expression prediction network
-    ├── training.rs     # training loop (Phase 3)
-    └── validate.rs     # held-out evaluation
+    ├── lib.rs          # module entry, re-exports
+    ├── features.rs     # molecular feature extraction
+    └── prediction.rs   # linear regression predictor
 ```
 
 ---
@@ -177,7 +176,7 @@ crates/tideglass-gps4drug/
 **Paper**: Xing 2026 (*Cell*, screening validation)
 **DOI**: 10.1016/j.cell.2026.02.023
 **Claim**: ZINC screening recovers known HCC actives (enrichment AUC)
-**Dependencies**: Module 3 (GPS4Drug predictions for large-scale screening)
+**Dependencies**: Module 1 (RGES-ranked hits); Module 3 (optional GPS4Drug predictions for virtual compounds)
 
 ### What it does
 
@@ -186,11 +185,12 @@ Screens a large compound library (ZINC) for molecules that reverse a disease gen
 ### Pipeline
 
 ```
-1. Define disease signature (HCC from TCGA)
-2. For each ZINC compound:
-   a. Predict expression profile (Module 3 GPS4Drug)
-   b. Compute RGES against disease signature (Module 1)
-3. Rank compounds by RGES
+1. Load compound library (ZINC subset) with SMILES and properties
+2. Apply multi-criteria filters to RGES-ranked hits:
+   a. Lipinski rule-of-five (MW, logP, HBD, HBA)
+   b. Structural alert pattern matching (reactive/toxic motifs)
+   c. RGES reversal strength and p-value / FDR thresholds
+3. Return filtered, ranked compound list
 4. Validate: check enrichment of known HCC actives in top-ranked
 ```
 
@@ -206,17 +206,22 @@ Screens a large compound library (ZINC) for molecules that reverse a disease gen
 
 Enrichment AUC ≥ 0.70 for recovery of known HCC actives from ZINC library.
 
+### Implementation notes
+
+- Compound library loader in `tideglass-screen/src/library.rs` (`CompoundLibrary`, `LipinskiConfig`)
+- Multi-criteria filtering in `tideglass-screen/src/filter.rs` (`filter_ranked_hits`, `ScreenFilterConfig`)
+- Filters: Lipinski rule-of-five, structural alert patterns, RGES strength, raw p-value, FDR-adjusted p-value
+- IPC handler: `science.compound_screen` via UniBin dispatch
+
 ### Crate structure
 
 ```
 crates/tideglass-screen/
 ├── Cargo.toml
 └── src/
-    ├── lib.rs          # module entry
-    ├── library.rs      # compound library loader (ZINC)
-    ├── screener.rs     # batch screening orchestrator
-    ├── enrichment.rs   # enrichment AUC calculation
-    └── report.rs       # screening results + provenance
+    ├── lib.rs          # module entry, re-exports
+    ├── library.rs      # compound library loader + Lipinski config
+    └── filter.rs       # Lipinski + structural alert + RGES/p-value filtering
 ```
 
 ---
@@ -254,18 +259,24 @@ Monte Carlo Tree Search (MCTS) with Structure-Gene-Activity Relationships (SGAR)
 
 From HCC lead (IC50 ~4µM), produce optimized compound with predicted IC50 ≤ 1µM and selectivity index ≥ 10.
 
+### Implementation notes
+
+- MCTS orchestrator in `tideglass-molsearch/src/search.rs` (`MctsSearch`, UCB1 selection, configurable iterations)
+- Tree structure in `tideglass-molsearch/src/tree.rs` (`MctsNode`, path selection)
+- Five action types in `tideglass-molsearch/src/action.rs`: `AddSubstituent`, `RemoveGroup`, `RingModification`, `ReplaceAtom` (default set of 5 actions)
+- Configurable via `MctsConfig` (iterations, exploration constant, max depth, target potency)
+- IPC handler: `science.mcts_optimize` via UniBin dispatch
+
 ### Crate structure
 
 ```
 crates/tideglass-molsearch/
 ├── Cargo.toml
 └── src/
-    ├── lib.rs          # module entry
-    ├── tree.rs         # MCTS tree structure
-    ├── search.rs       # UCB1 selection + rollout
-    ├── chemistry.rs    # chemical modification enumeration
-    ├── objective.rs    # multi-objective evaluation (SGAR)
-    └── synthesize.rs   # synthetic accessibility scoring
+    ├── lib.rs          # module entry, re-exports
+    ├── tree.rs         # MCTS tree structure + UCB1 path selection
+    ├── search.rs       # MCTS orchestrator (selection, expansion, rollout, backprop)
+    └── action.rs       # molecular modification actions + default action set
 ```
 
 ---
@@ -285,16 +296,22 @@ Benchmark GPS reversal screening against the OCTAD platform. Both platforms iden
 
 GPS enrichment AUC must exceed OCTAD enrichment AUC for the same HCC target set. Published margin: GPS AUC ~0.78 vs OCTAD AUC ~0.65.
 
+### Implementation notes
+
+- Classification metrics in `tideglass-octad/src/metrics.rs`: AUC (trapezoidal ROC), precision/recall, F1, concordance correlation
+- Benchmark framework in `tideglass-octad/src/benchmark.rs` (`OctadComparison`, `BenchmarkResult`)
+- Compares GPS-ranked compounds against OCTAD reference active lists
+- IPC handler: `science.octad_benchmark` via UniBin dispatch
+
 ### Crate structure
 
 ```
 crates/tideglass-octad/
 ├── Cargo.toml
 └── src/
-    ├── lib.rs          # module entry
-    ├── octad.rs        # OCTAD pipeline reproduction
-    ├── compare.rs      # GPS vs OCTAD head-to-head
-    └── report.rs       # parity analysis output
+    ├── lib.rs          # module entry, re-exports
+    ├── metrics.rs      # AUC, precision/recall, F1, concordance correlation
+    └── benchmark.rs    # OCTAD comparison framework
 ```
 
 ---
@@ -325,15 +342,20 @@ Generate candidate compound list for NF1-driven tumors. No published baseline �
 2. BindingDB affinity filter (do candidates bind NF1-relevant targets?)
 3. Selectivity screen (off-target profile)
 
+### Implementation notes
+
+- Tissue-weighted reversal scoring in `tideglass-nf/src/scoring.rs` (`compute_nf_scores`, `NfReversalScore`)
+- Compartment geometry in `tideglass-nf/src/tissue.rs` (`TissueCompartment`, `GeneCompartmentMap`, `TissueWeight`)
+- Extends core RGES with geometry-weighted enrichment using Anderson disorder analogy (hotSpring)
+- IPC handler: `science.nf_score` via UniBin dispatch
+
 ### Crate structure
 
 ```
 crates/tideglass-nf/
 ├── Cargo.toml
 └── src/
-    ├── lib.rs          # module entry
-    ├── nf_signature.rs # NF1 disease signature extraction
-    ├── screen.rs       # GPS reversal screen for NF signatures
-    ├── affinity.rs     # BindingDB affinity filter
-    └── candidates.rs   # candidate prioritization + report
+    ├── lib.rs          # module entry, re-exports
+    ├── tissue.rs       # tissue compartment geometry + gene assignments
+    └── scoring.rs      # tissue-weighted reversal scoring
 ```

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 [workspace]
 members = ["crates/*"]
 resolver = "2"
@@ -10,6 +12,16 @@ license = "AGPL-3.0-or-later"
 repository = "https://git.primals.eco/ecoPrimals/tideGlass"
 
 [workspace.dependencies]
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
-tokio = { version = "1", features = ["full"] }
+thiserror = "2"
+rand = "0.9"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "io-util", "macros", "signal"] }
+tideglass-core = { path = "crates/tideglass-core" }
+tideglass-rges = { path = "crates/tideglass-rges" }
+tideglass-rcl = { path = "crates/tideglass-rcl" }
+tideglass-gps4drug = { path = "crates/tideglass-gps4drug" }
+tideglass-screen = { path = "crates/tideglass-screen" }
+tideglass-molsearch = { path = "crates/tideglass-molsearch" }
+tideglass-octad = { path = "crates/tideglass-octad" }
+tideglass-nf = { path = "crates/tideglass-nf" }
