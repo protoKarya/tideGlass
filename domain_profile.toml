@@ -1,0 +1,60 @@
+# Domain Profile: tideGlass — Drug Repurposing & Pharmacogenomics
+# Gen5 drug repurposing via RGES pipeline, leveraging westGate data federation.
+
+[profile]
+id = "tideglass-drug-repurposing"
+version = "0.1.0"
+domain = "drug-repurposing"
+subdomain = ["rges-pipeline", "pharmacogenomics", "nf-drug-discovery"]
+tools = ["Rust", "barraCuda", "sweetGrass provenance"]
+methods = [
+    "reversal-gene-expression-score",
+    "gene-set-enrichment",
+    "connectivity-mapping",
+    "multi-omics-integration",
+]
+
+[translation]
+
+[[translation.entity_groups]]
+name = "rges_pipeline"
+domain_description = "Reversal Gene Expression Score computation for drug repurposing"
+computation = "Disease signature → LINCS L1000 query → enrichment → compound ranking"
+modules = ["rges"]
+
+[[translation.entity_groups]]
+name = "nf_drug_discovery"
+domain_description = "Neurofibromatosis drug repurposing using NF Data Portal + ChEMBL + LINCS"
+computation = "NF expression profiles → RGES → BindingDB affinity filter → candidate prioritization"
+modules = ["nf_pipeline"]
+
+[derivation]
+
+[[derivation.pipeline]]
+name = "rges_screen"
+description = "Full RGES screen against LINCS L1000 perturbation database"
+input = "Disease expression profile (GEO/TCGA)"
+output = "Ranked compound list with reversal scores and provenance braid"
+tool = "tideGlass rges module (CPU + barraCuda for large matrices)"
+
+[audit]
+
+[[audit.checks]]
+name = "rges_reference_parity"
+description = "RGES scores match GPS4Drug reference within tolerance"
+applies_to = ["rges"]
+
+[[audit.checks]]
+name = "provenance_completeness"
+description = "All pipeline outputs have BLAKE3 hashes and DAG session provenance"
+applies_to = "all"
+
+[figures]
+auto_generate = false
+
+[[figures.plot]]
+name = "rges_volcano"
+module = "rges"
+type = "scatter"
+x_axis = "RGES score"
+y_axis = "-log10(p-value)"
