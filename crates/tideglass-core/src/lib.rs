@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 #![warn(clippy::pedantic, clippy::nursery)]
 
+pub mod cas;
 pub mod discovery;
 pub mod enrichment;
 pub mod error;

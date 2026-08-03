@@ -19,12 +19,14 @@ use tideglass_rcl::{RclConfig, rank_cell_lines};
 use tideglass_rges::{RankedRgesHit, RgesPipeline, ScreenConfig};
 use tideglass_screen::{CompoundLibrary, ScreenFilterConfig, filter_ranked_hits};
 
+use crate::data::ModuleData;
+
 const JSONRPC_VERSION: &str = "2.0";
 const CAS_NOT_LOADED: &str = "Module not yet data-loaded — awaiting CAS initialization";
 
 /// Dispatches a single NDJSON-framed JSON-RPC request line to the appropriate handler.
 #[must_use]
-pub fn dispatch_request(raw: &str) -> JsonRpcResponse {
+pub fn dispatch_request(raw: &str, module_data: &ModuleData) -> JsonRpcResponse {
     let request: JsonRpcRequest = match serde_json::from_str(raw) {
         Ok(req) => req,
         Err(error) => {
@@ -35,14 +37,14 @@ pub fn dispatch_request(raw: &str) -> JsonRpcResponse {
     let result = match request.method.as_ref() {
         methods::CAPABILITIES_LIST => Ok(crate::capabilities::list()),
         methods::HEALTH_LIVENESS => Ok(crate::health::liveness()),
-        methods::HEALTH_CHECK => Ok(crate::health::check()),
-        methods::HEALTH_READINESS => Ok(crate::health::readiness()),
+        methods::HEALTH_CHECK => Ok(crate::health::check_with_cas(module_data)),
+        methods::HEALTH_READINESS => Ok(crate::health::readiness_with_cas(module_data)),
         methods::RGES_SCREEN => handle_rges_screen(request.params.as_ref()),
         methods::RCL_SELECT => handle_rcl_select(request.params.as_ref()),
-        methods::GPS4DRUG_PREDICT => handle_gps4drug_predict(request.params.as_ref()),
-        methods::COMPOUND_SCREEN => handle_compound_screen(request.params.as_ref()),
+        methods::GPS4DRUG_PREDICT => handle_gps4drug_predict(request.params.as_ref(), module_data),
+        methods::COMPOUND_SCREEN => handle_compound_screen(request.params.as_ref(), module_data),
         methods::MCTS_OPTIMIZE => handle_mcts_optimize(request.params.as_ref()),
-        methods::OCTAD_BENCHMARK => handle_octad_benchmark(request.params.as_ref()),
+        methods::OCTAD_BENCHMARK => handle_octad_benchmark(request.params.as_ref(), module_data),
         methods::NF_SCORE => handle_nf_score(request.params.as_ref()),
         other => Err((-32_601, format!("Method not found: {other}"))),
     };
@@ -104,12 +106,19 @@ struct Gps4DrugPredictParams {
     config: Option<LinearRegressionConfig>,
 }
 
-fn handle_gps4drug_predict(params: Option<&Value>) -> Result<Value, (i64, String)> {
+fn handle_gps4drug_predict(
+    params: Option<&Value>,
+    module_data: &ModuleData,
+) -> Result<Value, (i64, String)> {
     let params = require_params(params)?;
     let parsed: Gps4DrugPredictParams = deserialize_params(params)?;
 
-    let (Some(weights), Some(config)) = (parsed.weights, parsed.config) else {
-        return Err(cas_not_loaded());
+    let (weights, config) = match (parsed.weights, parsed.config) {
+        (Some(w), Some(c)) => (w, c),
+        _ => match &module_data.gps4drug_weights {
+            Some(loaded) => (loaded.weights.clone(), loaded.config.clone()),
+            None => return Err(cas_not_loaded()),
+        },
     };
 
     let predictor =
@@ -129,11 +138,20 @@ struct CompoundScreenParams {
     filter_config: ScreenFilterConfig,
 }
 
-fn handle_compound_screen(params: Option<&Value>) -> Result<Value, (i64, String)> {
+fn handle_compound_screen(
+    params: Option<&Value>,
+    module_data: &ModuleData,
+) -> Result<Value, (i64, String)> {
     let params = require_params(params)?;
     let parsed: CompoundScreenParams = deserialize_params(params)?;
 
-    let library = parsed.library.ok_or_else(cas_not_loaded)?;
+    let library = match parsed.library {
+        Some(lib) => lib,
+        None => match &module_data.compound_library {
+            Some(loaded) => loaded.clone(),
+            None => return Err(cas_not_loaded()),
+        },
+    };
     let filtered = filter_ranked_hits(&parsed.hits, &library, &parsed.filter_config);
 
     serde_json::to_value(filtered).map_err(|error| (-32_603, error.to_string()))
@@ -167,11 +185,20 @@ struct OctadBenchmarkParams {
     config: BenchmarkConfig,
 }
 
-fn handle_octad_benchmark(params: Option<&Value>) -> Result<Value, (i64, String)> {
+fn handle_octad_benchmark(
+    params: Option<&Value>,
+    module_data: &ModuleData,
+) -> Result<Value, (i64, String)> {
     let params = require_params(params)?;
     let parsed: OctadBenchmarkParams = deserialize_params(params)?;
 
-    let known_actives = parsed.known_actives.ok_or_else(cas_not_loaded)?;
+    let known_actives = match parsed.known_actives {
+        Some(actives) => actives,
+        None => match &module_data.known_actives {
+            Some(loaded) => loaded.clone(),
+            None => return Err(cas_not_loaded()),
+        },
+    };
     let comparison = OctadComparison::new(parsed.config);
     let result = comparison
         .evaluate_gps(&parsed.ranked, &known_actives)
@@ -342,6 +369,10 @@ mod tests {
         })
     }
 
+    fn default_data() -> ModuleData {
+        ModuleData::default()
+    }
+
     fn error_code(response: &JsonRpcResponse) -> i64 {
         response
             .error
@@ -356,33 +387,33 @@ mod tests {
 
     #[test]
     fn parse_error_returns_invalid_request_code() {
-        let response = dispatch_request("{not valid json");
+        let response = dispatch_request("{not valid json", &default_data());
         assert_eq!(error_code(&response), -32_700);
         assert!(response.result.is_none());
     }
 
     #[test]
     fn missing_params_returns_invalid_params_code() {
-        let response = dispatch_request(&rpc_no_params(methods::RGES_SCREEN));
+        let response = dispatch_request(&rpc_no_params(methods::RGES_SCREEN), &default_data());
         assert_eq!(error_code(&response), -32_602);
     }
 
     #[test]
     fn method_not_found_returns_error_code() {
-        let response = dispatch_request(&rpc_no_params("science.unknown_method"));
+        let response = dispatch_request(&rpc_no_params("science.unknown_method"), &default_data());
         assert_eq!(error_code(&response), -32_601);
     }
 
     #[test]
     fn health_liveness_returns_alive() {
-        let response = dispatch_request(&rpc_no_params(methods::HEALTH_LIVENESS));
+        let response = dispatch_request(&rpc_no_params(methods::HEALTH_LIVENESS), &default_data());
         let result = result_value(&response);
         assert_eq!(result["alive"], true);
     }
 
     #[test]
     fn health_check_returns_healthy_with_seven_components() {
-        let response = dispatch_request(&rpc_no_params(methods::HEALTH_CHECK));
+        let response = dispatch_request(&rpc_no_params(methods::HEALTH_CHECK), &default_data());
         let result = result_value(&response);
         assert_eq!(result["status"], "healthy");
         assert_eq!(
@@ -396,14 +427,15 @@ mod tests {
 
     #[test]
     fn health_readiness_returns_ready() {
-        let response = dispatch_request(&rpc_no_params(methods::HEALTH_READINESS));
+        let response = dispatch_request(&rpc_no_params(methods::HEALTH_READINESS), &default_data());
         let result = result_value(&response);
         assert_eq!(result["ready"], true);
     }
 
     #[test]
     fn capabilities_list_returns_eleven_capabilities() {
-        let response = dispatch_request(&rpc_no_params(methods::CAPABILITIES_LIST));
+        let response =
+            dispatch_request(&rpc_no_params(methods::CAPABILITIES_LIST), &default_data());
         let result = result_value(&response);
         assert_eq!(result["count"], 11);
         assert_eq!(
@@ -417,15 +449,18 @@ mod tests {
 
     #[test]
     fn rges_screen_with_valid_params_returns_results() {
-        let response = dispatch_request(&rpc(
-            methods::RGES_SCREEN,
-            &json!({
-                "disease": sample_disease(),
-                "perturbations": [sample_perturbation("CHEMBL1")],
-                "enrichment_config": fast_enrichment_config(),
-                "screen_config": permissive_screen_config()
-            }),
-        ));
+        let response = dispatch_request(
+            &rpc(
+                methods::RGES_SCREEN,
+                &json!({
+                    "disease": sample_disease(),
+                    "perturbations": [sample_perturbation("CHEMBL1")],
+                    "enrichment_config": fast_enrichment_config(),
+                    "screen_config": permissive_screen_config()
+                }),
+            ),
+            &default_data(),
+        );
         let hits = result_value(&response).as_array().expect("hits array");
         assert_eq!(hits.len(), 1);
         assert!(
@@ -437,20 +472,23 @@ mod tests {
 
     #[test]
     fn rcl_select_with_valid_params_returns_rankings() {
-        let response = dispatch_request(&rpc(
-            methods::RCL_SELECT,
-            &json!({
-                "disease": sample_disease(),
-                "perturbations": [
-                    varied_perturbation("CHEMBL1", "1"),
-                    varied_perturbation("CHEMBL2", "2"),
-                ],
-                "config": {
-                    "enrichment_config": fast_enrichment_config(),
-                    "min_compounds_per_line": 2
-                }
-            }),
-        ));
+        let response = dispatch_request(
+            &rpc(
+                methods::RCL_SELECT,
+                &json!({
+                    "disease": sample_disease(),
+                    "perturbations": [
+                        varied_perturbation("CHEMBL1", "1"),
+                        varied_perturbation("CHEMBL2", "2"),
+                    ],
+                    "config": {
+                        "enrichment_config": fast_enrichment_config(),
+                        "min_compounds_per_line": 2
+                    }
+                }),
+            ),
+            &default_data(),
+        );
         let rankings = result_value(&response).as_array().expect("rankings array");
         assert_eq!(rankings.len(), 1);
         assert_eq!(rankings[0]["cell_line"], "A549");
@@ -464,13 +502,16 @@ mod tests {
 
     #[test]
     fn mcts_optimize_with_valid_params_returns_result() {
-        let response = dispatch_request(&rpc(
-            methods::MCTS_OPTIMIZE,
-            &json!({
-                "initial": sample_features(),
-                "config": fast_mcts_config()
-            }),
-        ));
+        let response = dispatch_request(
+            &rpc(
+                methods::MCTS_OPTIMIZE,
+                &json!({
+                    "initial": sample_features(),
+                    "config": fast_mcts_config()
+                }),
+            ),
+            &default_data(),
+        );
         let result = result_value(&response);
         assert_eq!(result["iterations_run"], 10);
         assert!(result["best_reward"].as_f64().is_some());
@@ -478,13 +519,16 @@ mod tests {
 
     #[test]
     fn nf_score_with_valid_params_returns_scores() {
-        let response = dispatch_request(&rpc(
-            methods::NF_SCORE,
-            &json!({
-                "disease": sample_disease(),
-                "perturbations": [sample_perturbation("CHEMBL_NF")],
-            }),
-        ));
+        let response = dispatch_request(
+            &rpc(
+                methods::NF_SCORE,
+                &json!({
+                    "disease": sample_disease(),
+                    "perturbations": [sample_perturbation("CHEMBL_NF")],
+                }),
+            ),
+            &default_data(),
+        );
         let scores = result_value(&response).as_array().expect("scores array");
         assert_eq!(scores.len(), 1);
         assert!(
@@ -496,10 +540,13 @@ mod tests {
 
     #[test]
     fn gps4drug_predict_without_weights_returns_cas_not_loaded_error() {
-        let response = dispatch_request(&rpc(
-            methods::GPS4DRUG_PREDICT,
-            &json!({ "features": sample_features() }),
-        ));
+        let response = dispatch_request(
+            &rpc(
+                methods::GPS4DRUG_PREDICT,
+                &json!({ "features": sample_features() }),
+            ),
+            &default_data(),
+        );
         assert_eq!(error_code(&response), -32_603);
         assert!(
             response
@@ -513,19 +560,22 @@ mod tests {
 
     #[test]
     fn compound_screen_without_library_returns_cas_not_loaded_error() {
-        let response = dispatch_request(&rpc(
-            methods::COMPOUND_SCREEN,
-            &json!({
-                "hits": [{
-                    "compound_id": "CHEMBL1",
-                    "rges_score": 0.5,
-                    "p_value": 0.01,
-                    "adjusted_p_value": 0.02,
-                    "reversal_strength": 0.5,
-                    "n_permutations": 100
-                }]
-            }),
-        ));
+        let response = dispatch_request(
+            &rpc(
+                methods::COMPOUND_SCREEN,
+                &json!({
+                    "hits": [{
+                        "compound_id": "CHEMBL1",
+                        "rges_score": 0.5,
+                        "p_value": 0.01,
+                        "adjusted_p_value": 0.02,
+                        "reversal_strength": 0.5,
+                        "n_permutations": 100
+                    }]
+                }),
+            ),
+            &default_data(),
+        );
         assert_eq!(error_code(&response), -32_603);
         assert!(
             response
@@ -539,12 +589,15 @@ mod tests {
 
     #[test]
     fn octad_benchmark_without_known_actives_returns_cas_not_loaded_error() {
-        let response = dispatch_request(&rpc(
-            methods::OCTAD_BENCHMARK,
-            &json!({
-                "ranked": [{ "compound_id": "A", "score": 0.9 }]
-            }),
-        ));
+        let response = dispatch_request(
+            &rpc(
+                methods::OCTAD_BENCHMARK,
+                &json!({
+                    "ranked": [{ "compound_id": "A", "score": 0.9 }]
+                }),
+            ),
+            &default_data(),
+        );
         assert_eq!(error_code(&response), -32_603);
         assert!(
             response

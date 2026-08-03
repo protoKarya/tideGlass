@@ -5,6 +5,8 @@
 use serde_json::{Value, json};
 use std::time::SystemTime;
 
+use crate::data::ModuleData;
+
 /// `health.liveness` — "is the process alive?" Always true if responding.
 #[must_use]
 pub fn liveness() -> Value {
@@ -14,7 +16,8 @@ pub fn liveness() -> Value {
     })
 }
 
-/// `health.check` — detailed component status.
+/// `health.check` — detailed component status (no CAS info).
+#[cfg(test)]
 #[must_use]
 pub fn check() -> Value {
     json!({
@@ -34,12 +37,50 @@ pub fn check() -> Value {
     })
 }
 
+/// `health.check` with CAS connection and data-loading status.
+#[must_use]
+pub fn check_with_cas(data: &ModuleData) -> Value {
+    json!({
+        "status": "healthy",
+        "primal": "tideglass",
+        "version": tideglass_core::VERSION,
+        "components": {
+            "rges": "ready",
+            "rcl": "ready",
+            "gps4drug": if data.gps4drug_weights.is_some() { "ready (CAS)" } else { "ready (caller-supplied)" },
+            "screen": if data.compound_library.is_some() { "ready (CAS)" } else { "ready (caller-supplied)" },
+            "molsearch": "ready",
+            "octad": if data.known_actives.is_some() { "ready (CAS)" } else { "ready (caller-supplied)" },
+            "nf": "ready",
+        },
+        "cas": {
+            "connected": data.cas_connected,
+            "datasets_loaded": data.loaded_datasets.len(),
+            "load_errors": data.load_errors.len(),
+        },
+        "timestamp": timestamp_iso(),
+    })
+}
+
 /// `health.readiness` — "can the primal accept work?" True when server is listening.
+#[cfg(test)]
 #[must_use]
 pub fn readiness() -> Value {
     json!({
         "ready": true,
         "modules_loaded": 7,
+        "timestamp": timestamp_iso(),
+    })
+}
+
+/// `health.readiness` with CAS status.
+#[must_use]
+pub fn readiness_with_cas(data: &ModuleData) -> Value {
+    json!({
+        "ready": true,
+        "modules_loaded": 7,
+        "cas_connected": data.cas_connected,
+        "cas_datasets": data.loaded_datasets.len(),
         "timestamp": timestamp_iso(),
     })
 }

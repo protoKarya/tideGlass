@@ -4,6 +4,8 @@
 //! tideGlass `UniBin` — sovereign drug repurposing service for biomeOS deployment.
 
 mod capabilities;
+mod cas_client;
+mod data;
 mod dispatch;
 mod health;
 mod server;
@@ -128,7 +130,18 @@ fn run_server(socket_path: &str) -> ExitCode {
         }
     };
 
-    if let Err(error) = runtime.block_on(server::run_server(socket_path)) {
+    let module_data = runtime.block_on(async {
+        if let Some(ref path) = tideglass_core::cas::discover_nestgate_socket() {
+            eprintln!("tideglass: nestGate CAS discovered at {path}");
+            let client = cas_client::CasClient::new(path);
+            std::sync::Arc::new(data::load_from_cas(&client).await)
+        } else {
+            eprintln!("tideglass: no nestGate socket found — running without CAS data");
+            std::sync::Arc::new(data::ModuleData::default())
+        }
+    });
+
+    if let Err(error) = runtime.block_on(server::run_server(socket_path, module_data)) {
         eprintln!("tideglass: server error: {error}");
         return ExitCode::FAILURE;
     }
