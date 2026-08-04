@@ -24,19 +24,23 @@ tideGlass does **not** connect directly to `nestgate.sock`. All CAS requests
 route through biomeOS Neural API for capability-based discovery:
 
 ```
-tideGlass → neural-api-default.sock → biomeOS capability routing → nestgate CAS → ZFS
+tideGlass → neural-api-*.sock → biomeOS capability routing → nestgate CAS → ZFS
+         ↘ (fallback) nestgate-*.sock → direct CAS
 ```
 
-**Socket discovery priority**:
+**Socket discovery priority** (prefix-glob scan):
 1. `NEURAL_API_SOCKET` env var (explicit override)
-2. `$XDG_RUNTIME_DIR/biomeos/neural-api-default.sock`
-3. `$XDG_RUNTIME_DIR/biomeos/neural-api.sock`
+2. `$XDG_RUNTIME_DIR/membrane/neural-api-*.sock` (Neural API, family-ID naming)
+3. `$XDG_RUNTIME_DIR/biomeos/neural-api-*.sock` (alternate dir)
 4. `NESTGATE_SOCKET` env var (direct fallback, bypasses routing)
-5. `$XDG_RUNTIME_DIR/biomeos/nestgate.sock` (direct fallback)
+5. `$XDG_RUNTIME_DIR/membrane/nestgate-*.sock` (direct, family-ID naming)
+6. `$XDG_RUNTIME_DIR/biomeos/nestgate-*.sock` (alternate dir)
+7. `/run/membrane/nestgate*.sock` (system membrane fallback)
 
-The Neural API handles semantic fallback: sending `content.get` to the Neural
-API socket is auto-routed to nestGate via `capability.call`. When nestGate
-evolves (e.g., `content.query`), consumers get it without rewiring.
+Live NUCLEUS uses `$XDG_RUNTIME_DIR/membrane/` with family-ID-suffixed names
+(e.g., `neural-api-westgate-tower-155f.sock`). Discovery uses prefix-glob rather
+than fixed filenames. Neural API → direct nestGate fallback is automatic when
+Neural API doesn't proxy `content.*` methods (DIV-8).
 
 ---
 

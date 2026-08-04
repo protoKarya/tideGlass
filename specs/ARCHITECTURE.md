@@ -145,7 +145,7 @@ cargo build --release
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -W clippy::pedantic -W clippy::nursery -D warnings
 cargo deny check
-cargo llvm-cov --workspace --all-features  # 92.71% regions, 94.11% lines
+cargo llvm-cov --workspace --all-features
 ```
 
 Deploy on westGate:
@@ -160,7 +160,7 @@ biomeos deploy --graph graphs/cells/tideglass_cell.toml
 
 | Metric | Value |
 |--------|-------|
-| Tests | 176 (`cargo test --workspace`) |
-| Coverage | 92.71% regions, 94.11% lines (`cargo llvm-cov --workspace --all-features`) |
+| Tests | 177 (`cargo test --workspace`) |
+| Coverage | `cargo llvm-cov --workspace --all-features` (run locally for current numbers) |
 | Unsafe code | `#![forbid(unsafe_code)]` on all workspace crates |
 | Dependencies | Pure Rust — no C bindings or FFI in the workspace |

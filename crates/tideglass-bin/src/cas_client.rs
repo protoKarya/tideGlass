@@ -227,13 +227,13 @@ mod tests {
     #[test]
     fn client_neural_api_routing() {
         let client = CasClient::new(
-            "/run/user/1000/biomeos/neural-api-default.sock",
+            "/run/user/1000/membrane/neural-api-westgate-tower-155f.sock",
             CasRouting::NeuralApi,
         );
         assert_eq!(client.routing(), CasRouting::NeuralApi);
         assert_eq!(
             client.socket_path(),
-            "/run/user/1000/biomeos/neural-api-default.sock"
+            "/run/user/1000/membrane/neural-api-westgate-tower-155f.sock"
         );
     }
 
