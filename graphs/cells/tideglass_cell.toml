@@ -5,7 +5,8 @@
 # Gate: westGate (519 GB local CAS federation).
 # Data: LINCS L1000, ChEMBL, PubChem, ZINC, TCGA, GEO via nestGate CAS.
 #
-# Deploy: biomeos deploy --graph graphs/cells/tideglass_cell.toml
+# Deploy: biomeos nucleus attach --cell graphs/cells/tideglass_cell.toml
+# Dry-run: biomeos nucleus attach --cell graphs/cells/tideglass_cell.toml --dry-run
 
 [graph]
 id = "tideglass-cell"
