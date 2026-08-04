@@ -36,28 +36,7 @@ and compare our outputs against their claims.**
 
 ---
 
-## Three Modules
-
-### 1. RCL — Robust Collaborative Learning
-
-Clean noisy drug-induced gene expression profiles from LINCS/L1000 using
-multi-network co-training with fuzzy membership and forget-rate scheduling.
-
-### 2. GPS4Drug — Structure → Expression → Screening
-
-Given a chemical structure (SMILES), predict induced gene expression changes.
-Screen compound libraries for molecules that *reverse* a disease transcriptomic
-signature. Virtual screening of millions of compounds in hours.
-
-### 3. MolSearch — Multi-Objective Compound Optimization
-
-Monte Carlo Tree Search with Structure-Gene-Activity Relationships (SGAR) for
-simultaneous optimization of potency, selectivity, drug-likeness, and synthetic
-accessibility.
-
----
-
-## Seven Science Modules (guideStone)
+## Seven Science Modules
 
 | Module | Crate | Binary | Paper | Claim |
 |--------|-------|--------|-------|-------|
@@ -73,23 +52,15 @@ accessibility.
 
 ## Ecosystem Integration
 
-tideGlass runs as a NUCLEUS composition. Primals provide capabilities via UDS:
+tideGlass runs as a biomeOS NUCLEUS composition on westGate (519 GB local data).
+CAS requests route through the Neural API (`neural-api-default.sock`) for
+capability-based discovery — no hardcoded primal socket paths.
 
-| Primal | Role | Tier |
-|--------|------|------|
-| nestGate | Content-addressed data fetch (LINCS, ChEMBL, PubChem, ZINC) | 2 |
-| barraCuda | WGSL shader dispatch (RGES batch scoring, MCTS evaluation) | 2 |
-| toadStool | GPU streaming dispatch (RCL training, MCTS tree search) | 3 |
-| rhizoCrypt | DAG provenance chain for each module execution | 3 |
-| loamSpine | Certificate chain for model weight verification | 3 |
-| sweetGrass | Attribution braid (6 papers, LINCS program, ChEMBL, NF Data Portal) | 3 |
-
-Springs contribute validated science:
-
-- **healthSpring** — Hill dose-response, MATRIX scoring, RGES enrichment, MCTS
-- **wetSpring** — ChEMBL/PubChem/NCBI data fetch, GCTx/HDF5 parse, provenance
-- **neuralSpring** — Deep learning patterns, multi-network architecture, SMILES encoding
-- **hotSpring** — Anderson disorder analogy, effective dimension mapping
+| Capability | Provider | How |
+|------------|----------|-----|
+| Content-addressed data | nestGate (via Neural API) | `content.get`, `content.put` |
+| GPU compute | barraCuda → toadStool (via Neural API) | `compute.dispatch` |
+| Provenance chain | rhizoCrypt → loamSpine → sweetGrass (via Neural API) | `dag.event.append`, `entry.append`, `braid.commit` |
 
 ---
 

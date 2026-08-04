@@ -2,28 +2,29 @@
 
 # validation/ — Reference outputs and future Python parity
 
-Python-first reproduction of GPS platform claims is **deferred**. The as-built
-system validates claims through Rust unit and integration tests in the workspace
-crates and `tideglass-bin` dispatch handlers.
+The as-built system validates claims through Rust unit and integration tests
+across the workspace crates and `tideglass-bin` dispatch handlers.
 
 ## Current validation baseline
 
-- **147 Rust tests** across all nine workspace crates
-- **92.71% line coverage** (`cargo llvm-cov --workspace --all-features`)
-
-Run the full suite locally:
+- **176 Rust tests** across all nine workspace crates
+- Zero clippy warnings (pedantic + nursery)
+- `cargo deny` clean (advisories, bans, licenses, sources)
 
 ```bash
-cargo test --workspace --all-features
-cargo llvm-cov --workspace --all-features
+cargo test --workspace
+cargo clippy --workspace --all-targets
+cargo deny check
 ```
 
 ## Future milestones
 
-- **Python parity layer** — notebooks under `notebooks/` will reproduce published
-  claims from primary data; Rust modules will be checked against those outputs.
 - **Expected output fixtures** — `validation/expected/` will hold JSON reference
   files (one per module) for guideStone and cell deploy validation gates.
+- **Chen 2017 benchmark** — RGES correlation target (r >= 0.52) against
+  published compound rankings. Requires GPS data JSON conversion.
+- **Python parity layer** — deferred. If needed, notebooks under `notebooks/`
+  will reproduce published claims from primary data.
 
 Until those land, module correctness is established by in-crate tests and IPC
 handler integration tests in `tideglass-bin`.

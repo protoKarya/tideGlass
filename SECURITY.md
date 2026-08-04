@@ -17,7 +17,7 @@ tideGlass follows [wateringHole security standards](https://git.primals.eco/ecoP
 for all ecoPrimals protists. Report vulnerabilities via a **private Forgejo issue**
 on the tideGlass repository — not via public GitHub:
 
-https://git.primals.eco/ecoPrimals/tideGlass/issues/new
+https://git.primals.eco/protoKarya/tideGlass/issues/new
 
 Include:
 
@@ -48,10 +48,11 @@ tideGlass inherits the ecoPrimals security model:
 
 ## Scope
 
-This policy covers the tideGlass workspace (`crates/*`, `graphs/`, `validation/`,
-tooling configs). For vulnerabilities in ecoPrimals primals (nestGate, barraCuda,
-petalTongue, rhizoCrypt, loamSpine, sweetGrass), report to the respective
-primal's security contact or the private Forgejo issue above.
+This policy covers the tideGlass workspace (`crates/*` including `tideglass-bin`,
+`graphs/`, `validation/`, tooling configs). The UDS socket (`tideglass.sock`) and
+Neural API routing path are in scope. For vulnerabilities in upstream primals
+(nestGate, barraCuda, biomeOS, rhizoCrypt, loamSpine, sweetGrass), report to
+the respective primal's security contact or the private Forgejo issue above.
 
 ## License
 

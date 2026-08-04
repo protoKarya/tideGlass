@@ -8,7 +8,7 @@ gen5-native protists.
 
 ## Prerequisites
 
-- Rust 2024 edition on stable toolchain (currently 1.87+; see `rust-toolchain.toml`)
+- Rust 2024 edition on stable toolchain (MSRV 1.87; see `rust-toolchain.toml`)
 - `cargo fmt`, `cargo clippy`, `cargo test`, and `cargo deny` available locally
 
 ## Development workflow
@@ -55,7 +55,9 @@ Coverage reporting via `cargo llvm-cov` is recommended for module changes.
 - **No cross-primal compile dependencies** — compose at runtime via biomeOS capability discovery
 - Module crates depend on `tideglass-core`; `tideglass-screen` also depends on `tideglass-rges` and `tideglass-gps4drug`; `tideglass-molsearch` depends on `tideglass-gps4drug`
 - `tideglass-bin` (UniBin) composes all module crates at runtime via JSON-RPC dispatch
-- Data access goes through nestGate CAS (`content.get`, `content.put`) on westGate
+- Data access goes through biomeOS Neural API (`neural-api-default.sock`) which
+  routes `content.get`/`content.put` to nestGate CAS on westGate. No direct
+  primal socket connections — capability-based routing only.
 
 ### File size
 

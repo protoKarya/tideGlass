@@ -50,5 +50,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Release date pending Phase 4 validation gate.
 
-[Unreleased]: https://git.primals.eco/ecoPrimals/tideGlass/compare/v0.1.0...HEAD
-[0.1.0]: https://git.primals.eco/ecoPrimals/tideGlass/releases/tag/v0.1.0
+[Unreleased]: https://git.primals.eco/protoKarya/tideGlass/compare/v0.1.0...HEAD
+[0.1.0]: https://git.primals.eco/protoKarya/tideGlass/releases/tag/v0.1.0

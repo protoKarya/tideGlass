@@ -40,7 +40,7 @@ the ecosystem would not have discovered organically.
 - **artifact/** — guideStone-format data and expected outputs
 - **graphs/** — Deploy graph TOMLs for NUCLEUS composition
 - **shaders/** — WGSL shaders for barraCuda dispatch
-- **validation/** — deferred Python reproduction scaffold (future)
+- **validation/** — reference outputs and future fixture milestone targets
 
 ## IPC Methods
 
