@@ -10,7 +10,7 @@ use std::sync::Arc;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use serde_json::{Value, json};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UnixStream;
 
 use tideglass_core::cas::{
@@ -87,12 +87,34 @@ impl CasClient {
 
     /// Lists all CAS objects, optionally filtered by family.
     ///
+    /// Warning: on large CAS stores (300K+ objects) this returns a multi-MB
+    /// response. Prefer [`check_health`] for connectivity checks.
+    ///
     /// # Errors
     ///
     /// Returns [`TideGlassError::DataAccess`] on transport failure.
+    #[allow(dead_code)]
     pub async fn list(&self, family_id: Option<&str>) -> Result<CasListResponse, TideGlassError> {
         let params = family_id.map_or_else(|| json!({}), |fid| json!({"family_id": fid}));
         self.call(methods::CONTENT_LIST, params).await
+    }
+
+    /// Lightweight connectivity check via `health.check`.
+    ///
+    /// Returns the nestGate version string on success. This is much cheaper
+    /// than `content.list` on large CAS stores (333K+ objects = 30 MB response).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TideGlassError::Transport`] if the socket is unreachable.
+    pub async fn check_health(&self) -> Result<String, TideGlassError> {
+        let response: Value = self.call("health.check", json!({})).await?;
+        let version = response
+            .get("version")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown")
+            .to_owned();
+        Ok(version)
     }
 
     /// Stores bytes in CAS via Neural API or direct, returning the BLAKE3 hash.
@@ -126,18 +148,20 @@ impl CasClient {
     }
 
     /// Sends a JSON-RPC 2.0 request over UDS and deserializes the response.
+    ///
+    /// Reads the entire response body (nestGate can return multi-MB JSON for
+    /// `content.list` on large stores). Uses `read_to_end` instead of
+    /// line-based parsing to handle arbitrarily large responses.
     async fn call<T: serde::de::DeserializeOwned>(
         &self,
         method: &str,
         params: Value,
     ) -> Result<T, TideGlassError> {
-        let stream = UnixStream::connect(self.socket_path.as_ref())
+        let mut stream = UnixStream::connect(self.socket_path.as_ref())
             .await
             .map_err(|err| {
                 TideGlassError::Transport(format!("CAS connect to {}: {err}", self.socket_path))
             })?;
-
-        let (reader, mut writer) = stream.into_split();
 
         let request = json!({
             "jsonrpc": "2.0",
@@ -149,21 +173,27 @@ impl CasClient {
             .map_err(|err| TideGlassError::DataAccess(format!("serialize CAS request: {err}")))?;
         request_bytes.push(b'\n');
 
-        writer.write_all(&request_bytes).await.map_err(|err| {
+        stream.write_all(&request_bytes).await.map_err(|err| {
             TideGlassError::Transport(format!("CAS write to {}: {err}", self.socket_path))
         })?;
-        writer
+        stream
             .shutdown()
             .await
             .map_err(|err| TideGlassError::Transport(format!("CAS shutdown write: {err}")))?;
 
-        let mut reader = BufReader::new(reader);
-        let mut line = String::new();
-        reader.read_line(&mut line).await.map_err(|err| {
+        let mut buf = Vec::new();
+        stream.read_to_end(&mut buf).await.map_err(|err| {
             TideGlassError::Transport(format!("CAS read from {}: {err}", self.socket_path))
         })?;
 
-        let rpc_response: Value = serde_json::from_str(&line)
+        if buf.is_empty() {
+            return Err(TideGlassError::Transport(format!(
+                "CAS {method}: empty response from {}",
+                self.socket_path
+            )));
+        }
+
+        let rpc_response: Value = serde_json::from_slice(&buf)
             .map_err(|err| TideGlassError::DataAccess(format!("CAS response parse: {err}")))?;
 
         if let Some(error) = rpc_response.get("error") {

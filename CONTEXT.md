@@ -74,7 +74,8 @@ conversion, Chen 2017 benchmark, provenance write via Neural API.
 
 ## Status
 
-Phase 4 — Package. Rust workspace rebuilt and tested (176 tests). G56 Neural
-API routing complete. Provenance convergence gate implemented. CAS wiring live
-with graceful degradation. Current work: GPS JSON conversion, Chen 2017
+Phase 4 — Package. Rust workspace rebuilt and tested (177 tests). G56 Neural
+API routing with direct nestGate fallback. Validated against live 13-primal
+NUCLEUS on westGate — first RGES computation on live hardware. CAS store has
+333,695 objects (54.9 GB). Current work: GPS JSON conversion, Chen 2017
 benchmark (r >= 0.52), provenance write chain.

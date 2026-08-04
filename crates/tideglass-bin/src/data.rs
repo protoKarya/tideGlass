@@ -63,20 +63,19 @@ pub async fn load_from_cas(client: &CasClient) -> ModuleData {
         ..ModuleData::default()
     };
 
-    match client.list(None).await {
-        Ok(list_response) => {
+    match client.check_health().await {
+        Ok(version) => {
             data.cas_connected = true;
             let route_label = match client.routing() {
                 CasRouting::NeuralApi => "Neural API",
                 CasRouting::Direct => "direct",
             };
             eprintln!(
-                "tideglass: CAS connected via {route_label} — {} objects indexed",
-                list_response.count
+                "tideglass: CAS healthy via {route_label} — nestGate v{version}",
             );
         }
         Err(err) => {
-            let msg = format!("CAS connection failed: {err}");
+            let msg = format!("CAS health check failed: {err}");
             eprintln!("tideglass: {msg}");
             data.load_errors.push(msg);
             return data;

@@ -111,6 +111,25 @@ Default socket: {DEFAULT_SOCKET}"
     );
 }
 
+/// Scans for a direct nestGate socket, bypassing Neural API.
+fn discover_direct_nestgate() -> Option<String> {
+    if let Ok(path) = std::env::var(tideglass_core::cas::NESTGATE_SOCKET_ENV) {
+        if !path.is_empty() {
+            return Some(path);
+        }
+    }
+    if let Ok(xdg) = std::env::var("XDG_RUNTIME_DIR") {
+        for dir in &["membrane", "biomeos"] {
+            if let Some(path) =
+                tideglass_core::cas::find_socket_by_prefix(&format!("{xdg}/{dir}"), "nestgate-")
+            {
+                return Some(path);
+            }
+        }
+    }
+    None
+}
+
 fn print_capabilities() -> Result<(), Box<dyn std::error::Error>> {
     let json = serde_json::to_string_pretty(&capabilities::list())?;
     println!("{json}");
@@ -134,21 +153,39 @@ fn run_server(socket_path: &str) -> ExitCode {
     };
 
     let module_data = runtime.block_on(async {
-        if let Some(info) = tideglass_core::cas::discover_cas_socket() {
-            let route_label = match info.routing {
-                tideglass_core::cas::CasRouting::NeuralApi => "Neural API",
-                tideglass_core::cas::CasRouting::Direct => "direct",
-            };
-            eprintln!(
-                "tideglass: CAS discovered at {} ({})",
-                info.path, route_label
-            );
-            let client = cas_client::CasClient::new(&info.path, info.routing);
-            std::sync::Arc::new(data::load_from_cas(&client).await)
-        } else {
+        let Some(info) = tideglass_core::cas::discover_cas_socket() else {
             eprintln!("tideglass: no CAS socket found — running without CAS data");
-            std::sync::Arc::new(data::ModuleData::default())
+            return std::sync::Arc::new(data::ModuleData::default());
+        };
+
+        let route_label = match info.routing {
+            tideglass_core::cas::CasRouting::NeuralApi => "Neural API",
+            tideglass_core::cas::CasRouting::Direct => "direct",
+        };
+        eprintln!(
+            "tideglass: CAS discovered at {} ({route_label})",
+            info.path
+        );
+
+        let client = cas_client::CasClient::new(&info.path, info.routing);
+        let loaded = data::load_from_cas(&client).await;
+
+        if !loaded.cas_connected
+            && info.routing == tideglass_core::cas::CasRouting::NeuralApi
+        {
+            eprintln!("tideglass: Neural API unresponsive — falling back to direct nestGate");
+            if let Some(direct) = discover_direct_nestgate() {
+                eprintln!("tideglass: direct CAS at {direct}");
+                let fallback_client = cas_client::CasClient::new(
+                    &direct,
+                    tideglass_core::cas::CasRouting::Direct,
+                );
+                return std::sync::Arc::new(data::load_from_cas(&fallback_client).await);
+            }
+            eprintln!("tideglass: no direct nestGate socket found");
         }
+
+        std::sync::Arc::new(loaded)
     });
 
     if let Err(error) = runtime.block_on(server::run_server(socket_path, module_data)) {

@@ -24,9 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - OCTAD benchmark evaluation with AUC, precision/recall, F1, concordance correlation
 - Capability-based primal discovery system
 - biomeOS cell graph and guideStone deploy definitions
-- 176 tests, clippy pedantic/nursery clean, zero warnings
+- 177 tests, clippy pedantic/nursery clean, zero warnings
+- Live NUCLEUS validation on westGate — first RGES computation on hardware
 - cargo deny + clippy pedantic/nursery + rustfmt toolchain configs
-- G56 Neural API routing: CAS via `neural-api-default.sock` with direct fallback
+- G56 Neural API routing: prefix-glob socket discovery in `membrane/` with direct fallback
+- Neural API → direct nestGate automatic fallback when Neural API is unresponsive (DIV-8)
+- Socket discovery via `find_socket_by_prefix` — handles family-ID naming convention (DIV-7)
 - Provenance convergence gate: `is_dataset_converged()` for mixed-state data
 - CAS routing mode reporting in health triad responses
 - Centralized `PRIMAL_NAME` constant — single source of truth across all crates

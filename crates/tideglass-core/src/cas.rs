@@ -159,21 +159,25 @@ pub const NEURAL_API_SOCKET_ENV: &str = "NEURAL_API_SOCKET";
 /// Fallback: direct nestGate socket override (bypasses Neural API routing).
 pub const NESTGATE_SOCKET_ENV: &str = "NESTGATE_SOCKET";
 
-/// Neural API socket filenames, in discovery priority order.
-const NEURAL_API_SOCKET_NAMES: &[&str] = &["neural-api-default.sock", "neural-api.sock"];
+/// Directories to scan for NUCLEUS sockets, in priority order.
+/// Live NUCLEUS uses `membrane/`; earlier doc drafts referenced `biomeos/`.
+const SOCKET_DIRS: &[&str] = &["membrane", "biomeos"];
 
 /// Discovers the CAS transport socket using the G56 Neural API routing pattern.
 ///
 /// Priority:
 /// 1. `NEURAL_API_SOCKET` env var (explicit override)
-/// 2. `$XDG_RUNTIME_DIR/biomeos/neural-api-default.sock` (Neural API routing)
-/// 3. `$XDG_RUNTIME_DIR/biomeos/neural-api.sock` (alternate name)
-/// 4. `NESTGATE_SOCKET` env var (direct, bypasses routing)
-/// 5. `$XDG_RUNTIME_DIR/biomeos/nestgate.sock` (direct fallback)
-/// 6. `/run/membrane/nestgate.sock` (membrane fallback)
+/// 2. `$XDG_RUNTIME_DIR/{membrane,biomeos}/neural-api-*.sock` (Neural API, glob)
+/// 3. `NESTGATE_SOCKET` env var (direct, bypasses routing)
+/// 4. `$XDG_RUNTIME_DIR/{membrane,biomeos}/nestgate-*.sock` (direct, glob)
+/// 5. `/run/membrane/nestgate*.sock` (system membrane fallback)
 ///
-/// Steps 1–3 route through biomeOS Neural API (capability-based).
-/// Steps 4–6 connect directly to nestGate (no routing, no capability discovery).
+/// Steps 1–2 route through biomeOS Neural API (capability-based).
+/// Steps 3–5 connect directly to nestGate (no routing, no capability discovery).
+///
+/// Socket names use the NUCLEUS family-ID convention (e.g.
+/// `neural-api-westgate-tower-155f.sock`) and are discovered by prefix glob
+/// rather than fixed filenames.
 #[must_use]
 pub fn discover_cas_socket() -> Option<CasSocketInfo> {
     if let Ok(path) = std::env::var(NEURAL_API_SOCKET_ENV) {
@@ -186,22 +190,13 @@ pub fn discover_cas_socket() -> Option<CasSocketInfo> {
     }
 
     if let Ok(xdg) = std::env::var("XDG_RUNTIME_DIR") {
-        for name in NEURAL_API_SOCKET_NAMES {
-            let path = format!("{xdg}/biomeos/{name}");
-            if std::path::Path::new(&path).exists() {
+        for dir in SOCKET_DIRS {
+            if let Some(path) = find_socket_by_prefix(&format!("{xdg}/{dir}"), "neural-api-") {
                 return Some(CasSocketInfo {
                     path,
                     routing: CasRouting::NeuralApi,
                 });
             }
-        }
-
-        let direct = format!("{xdg}/biomeos/nestgate.sock");
-        if std::path::Path::new(&direct).exists() {
-            return Some(CasSocketInfo {
-                path: direct,
-                routing: CasRouting::Direct,
-            });
         }
     }
 
@@ -214,14 +209,38 @@ pub fn discover_cas_socket() -> Option<CasSocketInfo> {
         }
     }
 
-    let membrane_path = "/run/membrane/nestgate.sock";
-    if std::path::Path::new(membrane_path).exists() {
+    if let Ok(xdg) = std::env::var("XDG_RUNTIME_DIR") {
+        for dir in SOCKET_DIRS {
+            if let Some(path) = find_socket_by_prefix(&format!("{xdg}/{dir}"), "nestgate-") {
+                return Some(CasSocketInfo {
+                    path,
+                    routing: CasRouting::Direct,
+                });
+            }
+        }
+    }
+
+    if let Some(path) = find_socket_by_prefix("/run/membrane", "nestgate") {
         return Some(CasSocketInfo {
-            path: membrane_path.to_owned(),
+            path,
             routing: CasRouting::Direct,
         });
     }
 
+    None
+}
+
+/// Scans `dir` for the first `.sock` file whose name starts with `prefix`.
+#[must_use]
+pub fn find_socket_by_prefix(dir: &str, prefix: &str) -> Option<String> {
+    let entries = std::fs::read_dir(dir).ok()?;
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if name.starts_with(prefix) && name.ends_with(".sock") {
+            return Some(entry.path().to_string_lossy().into_owned());
+        }
+    }
     None
 }
 
@@ -365,12 +384,19 @@ mod tests {
     #[test]
     fn discover_cas_socket_does_not_panic() {
         let result = discover_cas_socket();
-        // May return Some on westGate with live socket, or None otherwise
         if let Some(info) = &result {
             assert!(!info.path.is_empty());
-            // Routing should be valid
-            let _ = info.routing;
+            assert!(
+                std::path::Path::new(&info.path)
+                    .extension()
+                    .is_some_and(|ext| ext == "sock")
+            );
         }
+    }
+
+    #[test]
+    fn find_socket_by_prefix_returns_none_for_missing_dir() {
+        assert!(find_socket_by_prefix("/nonexistent/dir", "neural-api-").is_none());
     }
 
     #[test]
