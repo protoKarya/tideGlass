@@ -72,10 +72,8 @@ pub fn benjamini_hochberg(p_values: &[f64]) -> Result<Vec<f64>> {
     let mut min_so_far = 1.0_f64;
 
     for (rank, &(original_index, p)) in indexed.iter().enumerate().rev() {
-        #[allow(clippy::cast_precision_loss)] // n is small (compound count)
-        let rank_f = (rank + 1) as f64;
-        #[allow(clippy::cast_precision_loss)]
-        let n_f = n as f64;
+        let rank_f = tideglass_core::count_as_f64(rank + 1);
+        let n_f = tideglass_core::count_as_f64(n);
         let raw_adjusted = (p * n_f / rank_f).min(1.0);
         min_so_far = min_so_far.min(raw_adjusted);
         adjusted_sorted[original_index] = min_so_far;

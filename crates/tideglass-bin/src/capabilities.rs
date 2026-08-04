@@ -5,11 +5,9 @@
 use std::sync::Arc;
 
 use serde_json::{Value, json};
-use tideglass_core::VERSION;
 use tideglass_core::discovery::Capability;
 use tideglass_core::ipc::methods;
-
-const PRIMAL_NAME: &str = "tideglass";
+use tideglass_core::{PRIMAL_NAME, VERSION};
 
 /// Returns the canonical `capabilities.list` response envelope.
 #[must_use]

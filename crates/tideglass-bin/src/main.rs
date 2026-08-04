@@ -13,7 +13,6 @@ mod server;
 use std::process::ExitCode;
 
 const DEFAULT_SOCKET: &str = "/run/tideglass/tideglass.sock";
-const PRIMAL_NAME: &str = "tideglass";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
@@ -24,7 +23,11 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Command::Version => {
-            println!("{} {}", PRIMAL_NAME, tideglass_core::VERSION);
+            println!(
+                "{} {}",
+                tideglass_core::PRIMAL_NAME,
+                tideglass_core::VERSION
+            );
             ExitCode::SUCCESS
         }
         Command::Capabilities => match print_capabilities() {
@@ -117,7 +120,7 @@ fn print_capabilities() -> Result<(), Box<dyn std::error::Error>> {
 fn run_server(socket_path: &str) -> ExitCode {
     eprintln!(
         "tideglass: starting {} v{} on {}",
-        PRIMAL_NAME,
+        tideglass_core::PRIMAL_NAME,
         tideglass_core::VERSION,
         socket_path
     );

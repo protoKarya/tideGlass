@@ -4,6 +4,7 @@
 
 use serde_json::{Value, json};
 use std::time::SystemTime;
+use tideglass_core::PRIMAL_NAME;
 
 use crate::data::ModuleData;
 
@@ -22,7 +23,7 @@ pub fn liveness() -> Value {
 pub fn check() -> Value {
     json!({
         "status": "healthy",
-        "primal": "tideglass",
+        "primal": PRIMAL_NAME,
         "version": tideglass_core::VERSION,
         "components": {
             "rges": "ready",
@@ -40,14 +41,11 @@ pub fn check() -> Value {
 /// `health.check` with CAS connection and data-loading status.
 #[must_use]
 pub fn check_with_cas(data: &ModuleData) -> Value {
-    let routing_label = data.cas_routing.map_or("none", |r| match r {
-        tideglass_core::cas::CasRouting::NeuralApi => "neural-api",
-        tideglass_core::cas::CasRouting::Direct => "direct",
-    });
+    let routing_label = cas_routing_label(data);
 
     json!({
         "status": "healthy",
-        "primal": "tideglass",
+        "primal": PRIMAL_NAME,
         "version": tideglass_core::VERSION,
         "components": {
             "rges": "ready",
@@ -83,10 +81,7 @@ pub fn readiness() -> Value {
 /// `health.readiness` with CAS routing and convergence status.
 #[must_use]
 pub fn readiness_with_cas(data: &ModuleData) -> Value {
-    let routing_label = data.cas_routing.map_or("none", |r| match r {
-        tideglass_core::cas::CasRouting::NeuralApi => "neural-api",
-        tideglass_core::cas::CasRouting::Direct => "direct",
-    });
+    let routing_label = cas_routing_label(data);
 
     json!({
         "ready": true,
@@ -96,6 +91,13 @@ pub fn readiness_with_cas(data: &ModuleData) -> Value {
         "cas_datasets": data.loaded_datasets.len(),
         "converged_datasets": data.converged_datasets.len(),
         "timestamp": timestamp_iso(),
+    })
+}
+
+fn cas_routing_label(data: &ModuleData) -> &'static str {
+    data.cas_routing.map_or("none", |r| match r {
+        tideglass_core::cas::CasRouting::NeuralApi => "neural-api",
+        tideglass_core::cas::CasRouting::Direct => "direct",
     })
 }
 
@@ -143,5 +145,56 @@ mod tests {
         for response in [liveness(), check(), readiness()] {
             assert!(response.get("timestamp").is_some());
         }
+    }
+
+    #[test]
+    fn check_uses_primal_name_constant() {
+        let response = check();
+        assert_eq!(response["primal"], tideglass_core::PRIMAL_NAME);
+    }
+
+    #[test]
+    fn check_with_cas_reports_routing_mode() {
+        let data = ModuleData {
+            cas_routing: Some(tideglass_core::cas::CasRouting::NeuralApi),
+            cas_connected: true,
+            ..ModuleData::default()
+        };
+
+        let response = check_with_cas(&data);
+        assert_eq!(response["cas"]["routing"], "neural-api");
+        assert_eq!(response["cas"]["connected"], true);
+        assert_eq!(response["primal"], tideglass_core::PRIMAL_NAME);
+    }
+
+    #[test]
+    fn check_with_cas_direct_routing() {
+        let data = ModuleData {
+            cas_routing: Some(tideglass_core::cas::CasRouting::Direct),
+            ..ModuleData::default()
+        };
+
+        let response = check_with_cas(&data);
+        assert_eq!(response["cas"]["routing"], "direct");
+    }
+
+    #[test]
+    fn check_with_cas_no_routing() {
+        let data = ModuleData::default();
+        let response = check_with_cas(&data);
+        assert_eq!(response["cas"]["routing"], "none");
+    }
+
+    #[test]
+    fn readiness_with_cas_reports_convergence() {
+        let data = ModuleData {
+            cas_connected: true,
+            converged_datasets: vec!["test".to_owned()],
+            ..ModuleData::default()
+        };
+
+        let response = readiness_with_cas(&data);
+        assert_eq!(response["converged_datasets"], 1);
+        assert_eq!(response["cas_connected"], true);
     }
 }

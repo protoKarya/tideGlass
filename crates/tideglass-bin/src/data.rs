@@ -35,6 +35,13 @@ pub struct ModuleData {
     pub load_errors: Vec<String>,
     /// Datasets that have been verified as fully converged (braided provenance).
     pub converged_datasets: Vec<String>,
+    /// CAS socket path — retained so dispatch can create write-back clients for
+    /// storing pipeline results.
+    #[allow(dead_code)]
+    pub cas_socket_path: Option<String>,
+    /// Routing mode for write-back clients.
+    #[allow(dead_code)]
+    pub cas_write_routing: Option<CasRouting>,
 }
 
 /// `GPS4Drug` pre-trained weights from CAS.
@@ -51,6 +58,8 @@ pub struct Gps4DrugWeights {
 pub async fn load_from_cas(client: &CasClient) -> ModuleData {
     let mut data = ModuleData {
         cas_routing: Some(client.routing()),
+        cas_socket_path: Some(client.socket_path().to_owned()),
+        cas_write_routing: Some(client.routing()),
         ..ModuleData::default()
     };
 
@@ -236,6 +245,40 @@ const fn resolve_dataset_hash(_dataset_key: &str) -> Option<CasHash> {
     None
 }
 
+/// Stores a pipeline result in CAS for provenance tracking.
+///
+/// Creates an ephemeral `CasClient` from the stored socket path and writes
+/// the serialized JSON result. Returns the BLAKE3 hash of the stored object.
+/// Called by async dispatch handlers when provenance write is enabled.
+///
+/// # Errors
+///
+/// Returns an error if CAS is not connected or the write fails.
+#[allow(dead_code)]
+pub async fn store_pipeline_result(
+    data: &ModuleData,
+    result_json: &[u8],
+    pipeline: &str,
+) -> Result<String, TideGlassError> {
+    let socket = data
+        .cas_socket_path
+        .as_deref()
+        .ok_or_else(|| TideGlassError::DataAccess("CAS not connected for result storage".into()))?;
+    let routing = data.cas_write_routing.unwrap_or(CasRouting::NeuralApi);
+
+    let client = CasClient::new(socket, routing);
+    let response = client
+        .put(
+            result_json,
+            Some("application/json"),
+            Some(tideglass_core::PRIMAL_NAME),
+            Some(pipeline),
+        )
+        .await?;
+
+    Ok(response.hash)
+}
+
 /// Checks whether a dataset has converged to fully braided provenance.
 ///
 /// Called by dispatch handlers before trusting pipeline outputs for the
@@ -338,12 +381,16 @@ mod tests {
         assert!(data.loaded_datasets.is_empty());
         assert!(data.converged_datasets.is_empty());
         assert!(data.load_errors.is_empty());
+        assert!(data.cas_socket_path.is_none());
+        assert!(data.cas_write_routing.is_none());
     }
 
     #[test]
     fn resolve_dataset_hash_returns_none_without_manifest() {
         assert!(resolve_dataset_hash("tideglass.compound_library").is_none());
         assert!(resolve_dataset_hash("tideglass.gps4drug_weights").is_none());
+        assert!(resolve_dataset_hash("tideglass.octad_known_actives").is_none());
+        assert!(resolve_dataset_hash("nonexistent.key").is_none());
     }
 
     #[test]
@@ -352,5 +399,14 @@ mod tests {
         assert!(DatasetConvergence::CasOnly.is_computation_safe());
         assert!(DatasetConvergence::FullyBraided.is_computation_safe());
         assert!(!DatasetConvergence::Unknown.is_computation_safe());
+    }
+
+    #[test]
+    fn convergence_equality() {
+        assert_eq!(DatasetConvergence::CasOnly, DatasetConvergence::CasOnly);
+        assert_ne!(
+            DatasetConvergence::CasOnly,
+            DatasetConvergence::FullyBraided
+        );
     }
 }

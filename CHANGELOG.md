@@ -24,11 +24,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - OCTAD benchmark evaluation with AUC, precision/recall, F1, concordance correlation
 - Capability-based primal discovery system
 - biomeOS cell graph and guideStone deploy definitions
-- 164 tests, clippy pedantic/nursery clean
+- 176 tests, clippy pedantic/nursery clean, zero warnings
 - cargo deny + clippy pedantic/nursery + rustfmt toolchain configs
 - G56 Neural API routing: CAS via `neural-api-default.sock` with direct fallback
 - Provenance convergence gate: `is_dataset_converged()` for mixed-state data
 - CAS routing mode reporting in health triad responses
+- Centralized `PRIMAL_NAME` constant — single source of truth across all crates
+- `count_as_f64()` helper — eliminated 17 scattered `#[allow(clippy::cast_precision_loss)]` annotations
+- `store_pipeline_result()` — provenance write path for CAS result persistence
+- `CasClient::socket_path()` accessor for write-back client creation
+- All 21 transitive dependencies verified pure Rust (no C FFI)
 - ScyBorg triple license (AGPL-3.0-or-later, ORC, CC-BY-SA 4.0)
 - SPDX headers on all source and documentation files
 

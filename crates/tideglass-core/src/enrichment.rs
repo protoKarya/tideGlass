@@ -72,11 +72,8 @@ pub fn weighted_ks_enrichment<S: BuildHasher>(
         });
     }
 
-    // Gene counts in expression signatures are always ≪ 2^52, so f64 conversion is exact.
-    #[allow(clippy::cast_precision_loss)]
-    let n_hits_f = n_hits as f64;
-    #[allow(clippy::cast_precision_loss)]
-    let n_miss_f = n_miss as f64;
+    let n_hits_f = crate::count_as_f64(n_hits);
+    let n_miss_f = crate::count_as_f64(n_miss);
 
     let mut running = 0.0_f64;
     let mut best_score = 0.0_f64;
@@ -158,9 +155,7 @@ pub fn permutation_p_value<S: BuildHasher>(
         }
     }
 
-    #[allow(clippy::cast_precision_loss)] // permutation counts are small
     let numerator = f64::from(count_ge.saturating_add(1));
-    #[allow(clippy::cast_precision_loss)]
     let denominator = f64::from(config.n_permutations.saturating_add(1));
 
     Ok(numerator / denominator)

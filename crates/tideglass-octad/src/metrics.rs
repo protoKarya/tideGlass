@@ -81,10 +81,8 @@ pub fn compute_auc(scores: &[f64], labels: &[bool]) -> Result<f64> {
     let mut fp = 0_u32;
     let mut curve = vec![MetricPoint { x: 0.0, y: 0.0 }];
 
-    #[allow(clippy::cast_precision_loss)]
-    let n_pos_f = n_pos as f64;
-    #[allow(clippy::cast_precision_loss)]
-    let n_neg_f = n_neg as f64;
+    let n_pos_f = tideglass_core::count_as_f64(n_pos);
+    let n_neg_f = tideglass_core::count_as_f64(n_neg);
 
     for (_, label) in &indexed {
         if *label {
@@ -183,8 +181,7 @@ pub fn concordance_correlation(x: &[f64], y: &[f64]) -> Result<f64> {
         });
     }
 
-    #[allow(clippy::cast_precision_loss)] // sample counts never approach 2^52
-    let n = x.len() as f64;
+    let n = tideglass_core::count_as_f64(x.len());
     let mean_x = x.iter().sum::<f64>() / n;
     let mean_y = y.iter().sum::<f64>() / n;
 

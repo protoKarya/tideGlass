@@ -76,10 +76,8 @@ pub fn compute_snr(results: &[RgesResult]) -> Result<(f64, f64, f64)> {
     }
 
     let values: Vec<f64> = results.iter().map(|r| r.reversal_strength).collect();
-    #[allow(clippy::cast_precision_loss)] // gene/compound counts never approach 2^52
-    let mean = values.iter().sum::<f64>() / values.len() as f64;
+    let mean = values.iter().sum::<f64>() / tideglass_core::count_as_f64(values.len());
 
-    #[allow(clippy::cast_precision_loss)]
     let variance = values
         .iter()
         .map(|value| {
@@ -87,7 +85,7 @@ pub fn compute_snr(results: &[RgesResult]) -> Result<(f64, f64, f64)> {
             diff * diff
         })
         .sum::<f64>()
-        / values.len().saturating_sub(1) as f64;
+        / tideglass_core::count_as_f64(values.len().saturating_sub(1));
 
     let std = variance.sqrt();
     let snr = if std > f64::EPSILON {

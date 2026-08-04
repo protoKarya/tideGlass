@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::VERSION;
 use crate::discovery::{Capability, PrimalIdentity};
+use crate::{PRIMAL_NAME, VERSION};
 
 /// JSON-RPC 2.0 method name constants following semantic `domain.operation` naming.
 pub mod methods {
@@ -77,7 +77,7 @@ pub struct JsonRpcError {
 #[must_use]
 pub fn tideglass_identity() -> PrimalIdentity {
     PrimalIdentity {
-        name: Arc::from("tideglass-core"),
+        name: Arc::from(PRIMAL_NAME),
         version: Arc::from(VERSION),
         capabilities: vec![
             capability(
@@ -113,7 +113,7 @@ mod tests {
     #[test]
     fn tideglass_identity_includes_health_and_capabilities() {
         let identity = tideglass_identity();
-        assert_eq!(identity.name.as_ref(), "tideglass-core");
+        assert_eq!(identity.name.as_ref(), PRIMAL_NAME);
         assert_eq!(identity.version.as_ref(), VERSION);
 
         let methods: Vec<&str> = identity

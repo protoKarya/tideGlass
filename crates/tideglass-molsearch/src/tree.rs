@@ -61,7 +61,6 @@ impl MctsNode {
             return f64::INFINITY;
         }
         let exploitation = self.average_reward();
-        #[allow(clippy::cast_precision_loss)]
         let exploration = exploration_constant
             * ((f64::from(parent_visits).ln()) / f64::from(self.visits)).sqrt();
         exploitation + exploration

@@ -135,7 +135,7 @@ cargo deny check
 
 | Metric | Value |
 |--------|-------|
-| Tests | 164 |
+| Tests | 176 |
 | Clippy | pedantic + nursery clean |
 | cargo deny | clean |
 | Unsafe code | `#![forbid(unsafe_code)]` on all crates |

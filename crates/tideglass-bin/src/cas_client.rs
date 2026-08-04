@@ -40,6 +40,12 @@ impl CasClient {
         self.routing
     }
 
+    /// Returns the socket path this client connects to.
+    #[must_use]
+    pub fn socket_path(&self) -> &str {
+        &self.socket_path
+    }
+
     /// Retrieves a CAS object by BLAKE3 hash. Returns decoded bytes on success.
     ///
     /// # Errors
@@ -89,12 +95,14 @@ impl CasClient {
         self.call(methods::CONTENT_LIST, params).await
     }
 
-    /// Stores bytes in CAS, returning the BLAKE3 hash and metadata.
+    /// Stores bytes in CAS via Neural API or direct, returning the BLAKE3 hash.
+    ///
+    /// Used by dispatch handlers to persist pipeline results. The stored object
+    /// is tagged with `stored_by: "tideglass"` for provenance tracking.
     ///
     /// # Errors
     ///
     /// Returns [`TideGlassError::DataAccess`] on transport failure.
-    #[allow(dead_code)]
     pub async fn put(
         &self,
         data: &[u8],
@@ -113,7 +121,7 @@ impl CasClient {
         if let Some(pipe) = pipeline {
             params["pipeline"] = Value::String(pipe.to_owned());
         }
-        params["stored_by"] = Value::String("tideglass".to_owned());
+        params["stored_by"] = Value::String(tideglass_core::PRIMAL_NAME.to_owned());
         self.call(methods::CONTENT_PUT, params).await
     }
 
@@ -182,7 +190,7 @@ mod tests {
     #[test]
     fn client_new_stores_path_and_routing() {
         let client = CasClient::new("/run/membrane/nestgate.sock", CasRouting::Direct);
-        assert_eq!(client.socket_path.as_ref(), "/run/membrane/nestgate.sock");
+        assert_eq!(client.socket_path(), "/run/membrane/nestgate.sock");
         assert_eq!(client.routing(), CasRouting::Direct);
     }
 
@@ -193,6 +201,17 @@ mod tests {
             CasRouting::NeuralApi,
         );
         assert_eq!(client.routing(), CasRouting::NeuralApi);
+        assert_eq!(
+            client.socket_path(),
+            "/run/user/1000/biomeos/neural-api-default.sock"
+        );
+    }
+
+    #[test]
+    fn client_socket_path_accessor() {
+        let path = "/tmp/test.sock";
+        let client = CasClient::new(path, CasRouting::Direct);
+        assert_eq!(client.socket_path(), path);
     }
 
     #[test]

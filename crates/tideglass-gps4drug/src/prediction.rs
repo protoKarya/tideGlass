@@ -114,12 +114,7 @@ impl ExpressionPredictor for LinearRegressionPredictor {
             .iter()
             .map(|gene| gene.log2_fold_change.abs())
             .sum::<f64>()
-            / {
-                #[allow(clippy::cast_precision_loss)]
-                {
-                    genes.len() as f64
-                }
-            };
+            / tideglass_core::count_as_f64(genes.len());
         let confidence = (mean_abs / (mean_abs + 1.0)).clamp(0.0, 1.0);
 
         Ok(ExpressionPrediction { genes, confidence })
@@ -149,8 +144,7 @@ pub fn compute_r_squared(predicted: &[f64], observed: &[f64]) -> Result<f64> {
         });
     }
 
-    #[allow(clippy::cast_precision_loss)] // sample counts never approach 2^52
-    let n = predicted.len() as f64;
+    let n = tideglass_core::count_as_f64(predicted.len());
     let mean_observed = observed.iter().sum::<f64>() / n;
 
     let ss_res: f64 = predicted
