@@ -8,28 +8,55 @@
 
 ## Data Locality
 
-tideGlass runs on westGate. All 519 GB of science data is on the same ZFS pool. Data access is **local** — `content.get` calls go directly to the local nestGate CAS, no songBird mesh traversal required.
+tideGlass runs on westGate. All 519 GB of science data is on the same ZFS pool.
+Data access routes through the **biomeOS Neural API** (`neural-api-default.sock`)
+which capability-routes `content.get`/`content.put` to the local nestGate CAS.
+No songBird mesh traversal required.
 
-This is why tideGlass is assigned to westGate and is a Phase 4 boot target (no mesh validation needed).
+This is why tideGlass is assigned to westGate and is a Phase 4 boot target (no
+mesh validation needed).
+
+---
+
+## CAS Routing (G56 Neural API Pattern)
+
+tideGlass does **not** connect directly to `nestgate.sock`. All CAS requests
+route through biomeOS Neural API for capability-based discovery:
+
+```
+tideGlass → neural-api-default.sock → biomeOS capability routing → nestgate CAS → ZFS
+```
+
+**Socket discovery priority**:
+1. `NEURAL_API_SOCKET` env var (explicit override)
+2. `$XDG_RUNTIME_DIR/biomeos/neural-api-default.sock`
+3. `$XDG_RUNTIME_DIR/biomeos/neural-api.sock`
+4. `NESTGATE_SOCKET` env var (direct fallback, bypasses routing)
+5. `$XDG_RUNTIME_DIR/biomeos/nestgate.sock` (direct fallback)
+
+The Neural API handles semantic fallback: sending `content.get` to the Neural
+API socket is auto-routed to nestGate via `capability.call`. When nestGate
+evolves (e.g., `content.query`), consumers get it without rewiring.
 
 ---
 
 ## Dataset Catalog (tideGlass-relevant)
 
-All datasets are ingested with full 5-step provenance pipeline.
+All datasets are ingested with BLAKE3 content-addressing. Provenance state
+varies — see Provenance Convergence section below.
 
 ### Drug Discovery & Chemistry (48 GB total on westGate)
 
 | Dataset | Size | Path | Provenance | Module(s) |
 |---------|------|------|------------|-----------|
-| **LINCS L1000** | 20 GB | `data/drug_discovery/lincs_l1000/` | BLAKE3 + DAG | 1 (RGES), 2 (RCL), 3 (GPS4Drug) |
-| **ChEMBL 37** | 15 GB | `data/drug_discovery/chembl/` | BLAKE3 + DAG | 1, 4 (screening), 5 (MCTS) |
-| **PubChem** | 11 GB | `data/drug_discovery/pubchem/` | BLAKE3 + DAG | 1, 4 |
-| **GPS Platform (Zenodo)** | 1.5 GB | `data/drug_discovery/gps_platform/` | BLAKE3 + DAG | all |
-| **BindingDB** | 583 MB | `data/drug_discovery/bindingdb/` | BLAKE3 + DAG | 5 (MCTS), 7 (NF) |
-| **ZINC20** | 244 MB | `data/drug_discovery/zinc/` | BLAKE3 + DAG | 4 (screening) |
-| **ChEBI** | 129 MB | `data/drug_discovery/chebi/` | BLAKE3 + DAG | 3 |
-| **Every Cure MATRIX** | 51 MB | `data/drug_discovery/every_cure/` | BLAKE3 + DAG | 1 |
+| **LINCS L1000** | 20 GB | `data/drug_discovery/lincs_l1000/` | CAS-indexed | 1 (RGES), 2 (RCL), 3 (GPS4Drug) |
+| **ChEMBL 37** | 15 GB | `data/drug_discovery/chembl/` | CAS-indexed | 1, 4 (screening), 5 (MCTS) |
+| **PubChem** | 11 GB | `data/drug_discovery/pubchem/` | CAS-indexed | 1, 4 |
+| **GPS Platform (Zenodo)** | 1.4 GB | `data/drug_discovery/gps_platform/` | CAS-indexed (NumPy/pickle — needs JSON conversion) | all |
+| **BindingDB** | 583 MB | `data/drug_discovery/bindingdb/` | CAS-indexed | 5 (MCTS), 7 (NF) |
+| **ZINC20** | 244 MB | `data/drug_discovery/zinc/` | CAS-indexed | 4 (screening) |
+| **ChEBI** | 129 MB | `data/drug_discovery/chebi/` | CAS-indexed | 3 |
+| **Every Cure MATRIX** | 51 MB | `data/drug_discovery/every_cure/` | CAS-indexed | 1 |
 
 ### Genomics (relevant to tideGlass)
 
@@ -42,7 +69,7 @@ All datasets are ingested with full 5-step provenance pipeline.
 
 | Dataset | Size (est.) | Status | Blocker | Module(s) |
 |---------|-------------|--------|---------|-----------|
-| **NF Data Portal** | TBD | Not downloaded | Registration required | 7 (NF extension) |
+| **NF Data Portal** | ~220/658 files ingested | CAS ingest in progress | — | 7 (NF extension) |
 | **DisGeNET** | ~2 GB | Credentials registered | Download pending | 7 |
 | **SRA FASTQ** | ~220 GB | Not started | Large download | future |
 
@@ -53,31 +80,39 @@ All datasets are ingested with full 5-step provenance pipeline.
 ### Pattern 1: Batch Read (Modules 1, 4, 6)
 
 ```
-tideGlass → nestGate.content.get(hash) → local ZFS → data
+tideGlass → Neural API → content.get(hash) → nestGate CAS → local ZFS → data
 ```
 
-Load large datasets (LINCS, ChEMBL) in bulk at pipeline start. Cache in memory for the duration of the screen. This is the primary access pattern.
+Load large datasets (LINCS, ChEMBL) in bulk at pipeline start. Cache in memory
+for the duration of the screen. This is the primary access pattern.
 
-**Performance**: Local ZFS, no network. Expected throughput: disk-limited (~500 MB/s sequential on NVMe).
+**Performance**: Local ZFS, no network. Expected throughput: disk-limited
+(~500 MB/s sequential on NVMe).
 
-### Pattern 2: Streaming Read (Modules 2, 3)
+### Pattern 2: Chunked Read (Modules 2, 3)
 
 ```
-tideGlass → nestGate.storage.retrieve(key) → stream chunks → process
+tideGlass → Neural API → content.get(hash) → nestGate CAS → chunked response
 ```
 
-For training loops (RCL, GPS4Drug), stream data in batches rather than loading all at once. 20 GB LINCS doesn't fit in memory for all cell lines simultaneously.
+For training loops (RCL, GPS4Drug), load data in chunked content.get calls
+rather than all at once. 20 GB LINCS doesn't fit in memory for all cell lines
+simultaneously.
+
+> **Note**: nestGate returns chunked responses for large objects (>1 MB) with
+> base64-encoded `data` field. There is no separate streaming API — `content.get`
+> handles both small and large objects.
 
 ### Pattern 3: Write (all modules)
 
 ```
-tideGlass result → nestGate.content.put(data) → CAS hash
-                 → rhizoCrypt.dag.event.append(hash)
-                 → loamSpine.entry.append(hash)
-                 → sweetGrass.braid.commit(attribution)
+tideGlass result → Neural API → content.put(data) → nestGate CAS → BLAKE3 hash
+                 → Neural API → dag.event.append(hash) → rhizoCrypt
+                 → Neural API → entry.append(hash) → loamSpine
+                 → Neural API → braid.commit(attribution) → sweetGrass
 ```
 
-Every pipeline output goes through the full provenance chain:
+Every pipeline output goes through the full provenance chain via Neural API:
 1. Content stored in nestGate CAS (content-addressed by BLAKE3)
 2. Execution event appended to rhizoCrypt DAG session
 3. Provenance entry appended to loamSpine ledger
@@ -86,47 +121,73 @@ Every pipeline output goes through the full provenance chain:
 ### Pattern 4: GPU Dispatch (Modules 2, 3, 5)
 
 ```
-tideGlass → toadStool.compute.dispatch(shader, data) → barraCuda GPU
+tideGlass → Neural API → compute.dispatch(shader, data) → toadStool → barraCuda GPU
          → result → tideGlass
 ```
 
-For matrix operations, training, and MCTS evaluation. barraCuda provides FP64 tensor math on westGate's GPU (if available) or CPU fallback.
+For matrix operations, training, and MCTS evaluation. barraCuda provides FP64
+tensor math on westGate's GPU (if available) or CPU fallback.
 
 ---
 
 ## nestGate CAS Integration
 
-tideGlass talks to nestGate via JSON-RPC over UDS:
+tideGlass talks to CAS via JSON-RPC over the Neural API socket:
 
 ```rust
-// Fetch data by content hash
-let data = nestgate_client.call("content.get", json!({
-    "hash": "blake3:abc123...",
-    "format": "gctx"
-})).await?;
+// Content hash is bare BLAKE3 hex (64 chars, no prefix)
+let hash = "a1b2c3d4e5f6..."; // 64-char lowercase hex
+
+// Fetch data by content hash (routed via Neural API → nestGate)
+let data = cas_client.get(hash).await?;
+
+// Check existence (returns metadata: hash, size, stored_at, derivation_depth)
+let exists = cas_client.exists(hash).await?;
 
 // Store pipeline output
-let hash = nestgate_client.call("content.put", json!({
-    "data": rges_results,
-    "metadata": {
-        "module": "rges",
-        "disease": "HCC",
-        "timestamp": "2026-08-03T12:00:00Z"
-    }
-})).await?;
+let response = cas_client.put(result_bytes, metadata).await?;
+// response.hash: BLAKE3 hex of stored content
+```
+
+> **DIV-1 (Resolved)**: Hash format is bare 64-char BLAKE3 hex — no `blake3:`
+> prefix. The original spec used `blake3:abc123...` which is not what nestGate
+> returns or accepts.
+
+---
+
+## Provenance Convergence
+
+westGate data exists in three provenance states (Wave 155u discovery):
+
+| State | Meaning | Can compute? |
+|-------|---------|--------------|
+| **Primordial** | On disk, no CAS hash | No |
+| **CAS-only** | BLAKE3 hash in CAS, no DAG/spine/braid | Yes (with caveat) |
+| **Fully braided** | CAS + rhizoCrypt DAG + loamSpine + sweetGrass | Yes |
+
+tideGlass implements `is_dataset_converged()` to check provenance state before
+running science pipelines. Currently permits CAS-only state (most GPS platform
+data). In production, only fully braided data should be trusted for results
+that enter the provenance chain.
+
+```rust
+let convergence = data::is_dataset_converged(&cas_client, "tideglass.gps4drug_weights").await;
+if convergence.is_computation_safe() {
+    // proceed with pipeline
+}
 ```
 
 ---
 
 ## Provenance Chain per Execution
 
-Every module execution creates a provenance chain:
+Every module execution creates a provenance chain via Neural API routing:
 
 ```
 rhizoCrypt: dag.session.create("tideglass-rges-screen-{timestamp}")
   → dag.event.append("input", { disease: "HCC", lincs_hash: "..." })
   → dag.event.append("compute", { compounds_scored: 15000, duration_ms: 4200 })
-  → dag.event.append("output", { result_hash: "blake3:...", top_10: [...] })
+  → dag.event.append("output", { result_hash: "...", top_10: [...] })
   → dag.merkle.root() → session_root_hash
 
 loamSpine: entry.append(session_root_hash)
@@ -135,3 +196,15 @@ loamSpine: entry.append(session_root_hash)
 sweetGrass: braid.create(["Chen2017", "LINCS_program", "ChEMBL"])
   → braid.commit(session_root_hash, attribution_chain)
 ```
+
+---
+
+## Current Implementation Status
+
+- CAS client: **Implemented** in `tideglass-bin/src/cas_client.rs`
+- Neural API routing: **Implemented** — prefers `neural-api-default.sock`, falls back to direct
+- Data loading: **Implemented** — `load_from_cas()` on startup, graceful degradation
+- Convergence gate: **Implemented** — `is_dataset_converged()` API, not yet wired to dispatch
+- Data manifest: **Not yet** — awaiting hash enumeration from CAS ingest pipeline
+- GPS data format: **Blocked** — NumPy/pickle in CAS, needs JSON conversion (DIV-4)
+- Provenance write: **Not yet** — awaiting Neural API routing to provenance trio primals

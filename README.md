@@ -135,12 +135,12 @@ cargo deny check
 
 | Metric | Value |
 |--------|-------|
-| Tests | 147 |
-| Region coverage (llvm-cov) | 92.71% |
-| Line coverage (llvm-cov) | 94.11% |
+| Tests | 164 |
 | Clippy | pedantic + nursery clean |
 | cargo deny | clean |
 | Unsafe code | `#![forbid(unsafe_code)]` on all crates |
+| CAS routing | G56 Neural API (`neural-api-default.sock`) |
+| Convergence gate | `is_dataset_converged()` for mixed-state data |
 
 ---
 

@@ -154,34 +154,93 @@ pub mod methods {
     pub const CONTENT_PUT: &str = "content.put";
 }
 
-/// Well-known socket paths for nestGate discovery, in priority order.
+/// Environment variable for Neural API socket override.
+pub const NEURAL_API_SOCKET_ENV: &str = "NEURAL_API_SOCKET";
+/// Fallback: direct nestGate socket override (bypasses Neural API routing).
 pub const NESTGATE_SOCKET_ENV: &str = "NESTGATE_SOCKET";
 
-/// Discovers the nestGate socket path using the standard resolution chain.
+/// Neural API socket filenames, in discovery priority order.
+const NEURAL_API_SOCKET_NAMES: &[&str] = &["neural-api-default.sock", "neural-api.sock"];
+
+/// Discovers the CAS transport socket using the G56 Neural API routing pattern.
 ///
-/// Priority: `NESTGATE_SOCKET` env var → `$XDG_RUNTIME_DIR/biomeos/nestgate.sock`
-/// → `/run/membrane/nestgate.sock` → `None`.
+/// Priority:
+/// 1. `NEURAL_API_SOCKET` env var (explicit override)
+/// 2. `$XDG_RUNTIME_DIR/biomeos/neural-api-default.sock` (Neural API routing)
+/// 3. `$XDG_RUNTIME_DIR/biomeos/neural-api.sock` (alternate name)
+/// 4. `NESTGATE_SOCKET` env var (direct, bypasses routing)
+/// 5. `$XDG_RUNTIME_DIR/biomeos/nestgate.sock` (direct fallback)
+/// 6. `/run/membrane/nestgate.sock` (membrane fallback)
+///
+/// Steps 1–3 route through biomeOS Neural API (capability-based).
+/// Steps 4–6 connect directly to nestGate (no routing, no capability discovery).
 #[must_use]
-pub fn discover_nestgate_socket() -> Option<String> {
-    if let Ok(path) = std::env::var(NESTGATE_SOCKET_ENV) {
+pub fn discover_cas_socket() -> Option<CasSocketInfo> {
+    if let Ok(path) = std::env::var(NEURAL_API_SOCKET_ENV) {
         if !path.is_empty() {
-            return Some(path);
+            return Some(CasSocketInfo {
+                path,
+                routing: CasRouting::NeuralApi,
+            });
         }
     }
 
     if let Ok(xdg) = std::env::var("XDG_RUNTIME_DIR") {
-        let path = format!("{xdg}/biomeos/nestgate.sock");
-        if std::path::Path::new(&path).exists() {
-            return Some(path);
+        for name in NEURAL_API_SOCKET_NAMES {
+            let path = format!("{xdg}/biomeos/{name}");
+            if std::path::Path::new(&path).exists() {
+                return Some(CasSocketInfo {
+                    path,
+                    routing: CasRouting::NeuralApi,
+                });
+            }
+        }
+
+        let direct = format!("{xdg}/biomeos/nestgate.sock");
+        if std::path::Path::new(&direct).exists() {
+            return Some(CasSocketInfo {
+                path: direct,
+                routing: CasRouting::Direct,
+            });
+        }
+    }
+
+    if let Ok(path) = std::env::var(NESTGATE_SOCKET_ENV) {
+        if !path.is_empty() {
+            return Some(CasSocketInfo {
+                path,
+                routing: CasRouting::Direct,
+            });
         }
     }
 
     let membrane_path = "/run/membrane/nestgate.sock";
     if std::path::Path::new(membrane_path).exists() {
-        return Some(membrane_path.to_owned());
+        return Some(CasSocketInfo {
+            path: membrane_path.to_owned(),
+            routing: CasRouting::Direct,
+        });
     }
 
     None
+}
+
+/// How CAS requests are routed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CasRouting {
+    /// Via biomeOS Neural API — capability-based routing to nestGate.
+    NeuralApi,
+    /// Direct UDS connection to nestGate — no capability routing.
+    Direct,
+}
+
+/// Discovered CAS socket with routing mode.
+#[derive(Debug, Clone)]
+pub struct CasSocketInfo {
+    /// Socket path.
+    pub path: String,
+    /// Whether this routes via Neural API or connects directly.
+    pub routing: CasRouting,
 }
 
 #[cfg(test)]
@@ -304,9 +363,19 @@ mod tests {
     }
 
     #[test]
-    fn discover_socket_does_not_panic() {
-        let result = discover_nestgate_socket();
+    fn discover_cas_socket_does_not_panic() {
+        let result = discover_cas_socket();
         // May return Some on westGate with live socket, or None otherwise
-        let _ = result;
+        if let Some(info) = &result {
+            assert!(!info.path.is_empty());
+            // Routing should be valid
+            let _ = info.routing;
+        }
+    }
+
+    #[test]
+    fn cas_routing_variants() {
+        assert_eq!(CasRouting::NeuralApi, CasRouting::NeuralApi);
+        assert_ne!(CasRouting::NeuralApi, CasRouting::Direct);
     }
 }

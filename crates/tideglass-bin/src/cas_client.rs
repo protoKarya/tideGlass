@@ -14,22 +14,30 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixStream;
 
 use tideglass_core::cas::{
-    CasExistsResponse, CasGetResponse, CasListResponse, CasPutResponse, methods,
+    CasExistsResponse, CasGetResponse, CasListResponse, CasPutResponse, CasRouting, methods,
 };
 use tideglass_core::error::TideGlassError;
 
-/// Async CAS client connected to a nestGate UDS socket.
+/// Async CAS client routed via biomeOS Neural API or direct to nestGate.
 pub struct CasClient {
     socket_path: Arc<str>,
+    routing: CasRouting,
 }
 
 impl CasClient {
-    /// Creates a new CAS client targeting the given socket path.
+    /// Creates a new CAS client targeting the given socket with routing mode.
     #[must_use]
-    pub fn new(socket_path: &str) -> Self {
+    pub fn new(socket_path: &str, routing: CasRouting) -> Self {
         Self {
             socket_path: Arc::from(socket_path),
+            routing,
         }
+    }
+
+    /// Returns the routing mode (Neural API vs direct).
+    #[must_use]
+    pub const fn routing(&self) -> CasRouting {
+        self.routing
     }
 
     /// Retrieves a CAS object by BLAKE3 hash. Returns decoded bytes on success.
@@ -172,9 +180,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn client_new_stores_path() {
-        let client = CasClient::new("/run/membrane/nestgate.sock");
+    fn client_new_stores_path_and_routing() {
+        let client = CasClient::new("/run/membrane/nestgate.sock", CasRouting::Direct);
         assert_eq!(client.socket_path.as_ref(), "/run/membrane/nestgate.sock");
+        assert_eq!(client.routing(), CasRouting::Direct);
+    }
+
+    #[test]
+    fn client_neural_api_routing() {
+        let client = CasClient::new(
+            "/run/user/1000/biomeos/neural-api-default.sock",
+            CasRouting::NeuralApi,
+        );
+        assert_eq!(client.routing(), CasRouting::NeuralApi);
     }
 
     #[test]

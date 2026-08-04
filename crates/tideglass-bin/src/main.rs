@@ -131,12 +131,19 @@ fn run_server(socket_path: &str) -> ExitCode {
     };
 
     let module_data = runtime.block_on(async {
-        if let Some(ref path) = tideglass_core::cas::discover_nestgate_socket() {
-            eprintln!("tideglass: nestGate CAS discovered at {path}");
-            let client = cas_client::CasClient::new(path);
+        if let Some(info) = tideglass_core::cas::discover_cas_socket() {
+            let route_label = match info.routing {
+                tideglass_core::cas::CasRouting::NeuralApi => "Neural API",
+                tideglass_core::cas::CasRouting::Direct => "direct",
+            };
+            eprintln!(
+                "tideglass: CAS discovered at {} ({})",
+                info.path, route_label
+            );
+            let client = cas_client::CasClient::new(&info.path, info.routing);
             std::sync::Arc::new(data::load_from_cas(&client).await)
         } else {
-            eprintln!("tideglass: no nestGate socket found — running without CAS data");
+            eprintln!("tideglass: no CAS socket found — running without CAS data");
             std::sync::Arc::new(data::ModuleData::default())
         }
     });

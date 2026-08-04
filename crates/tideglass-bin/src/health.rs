@@ -40,6 +40,11 @@ pub fn check() -> Value {
 /// `health.check` with CAS connection and data-loading status.
 #[must_use]
 pub fn check_with_cas(data: &ModuleData) -> Value {
+    let routing_label = data.cas_routing.map_or("none", |r| match r {
+        tideglass_core::cas::CasRouting::NeuralApi => "neural-api",
+        tideglass_core::cas::CasRouting::Direct => "direct",
+    });
+
     json!({
         "status": "healthy",
         "primal": "tideglass",
@@ -55,7 +60,9 @@ pub fn check_with_cas(data: &ModuleData) -> Value {
         },
         "cas": {
             "connected": data.cas_connected,
+            "routing": routing_label,
             "datasets_loaded": data.loaded_datasets.len(),
+            "converged_datasets": data.converged_datasets.len(),
             "load_errors": data.load_errors.len(),
         },
         "timestamp": timestamp_iso(),
@@ -73,14 +80,21 @@ pub fn readiness() -> Value {
     })
 }
 
-/// `health.readiness` with CAS status.
+/// `health.readiness` with CAS routing and convergence status.
 #[must_use]
 pub fn readiness_with_cas(data: &ModuleData) -> Value {
+    let routing_label = data.cas_routing.map_or("none", |r| match r {
+        tideglass_core::cas::CasRouting::NeuralApi => "neural-api",
+        tideglass_core::cas::CasRouting::Direct => "direct",
+    });
+
     json!({
         "ready": true,
         "modules_loaded": 7,
         "cas_connected": data.cas_connected,
+        "cas_routing": routing_label,
         "cas_datasets": data.loaded_datasets.len(),
+        "converged_datasets": data.converged_datasets.len(),
         "timestamp": timestamp_iso(),
     })
 }

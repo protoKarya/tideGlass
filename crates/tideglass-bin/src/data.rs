@@ -2,13 +2,14 @@
 
 //! CAS-backed data loading for tideGlass modules.
 //!
-//! Loads module data from nestGate CAS on server startup. Data is held in an
-//! `Arc<ModuleData>` shared across dispatch handlers.
+//! Loads module data from CAS (routed via biomeOS Neural API or direct to
+//! nestGate) on server startup. Data is held in an `Arc<ModuleData>` shared
+//! across dispatch handlers.
 
 use std::collections::HashMap;
 
 use serde::Deserialize;
-use tideglass_core::cas::CasHash;
+use tideglass_core::cas::{CasHash, CasRouting};
 use tideglass_core::error::TideGlassError;
 use tideglass_core::types::CompoundId;
 use tideglass_screen::{CompoundLibrary, LibraryCompound};
@@ -26,10 +27,14 @@ pub struct ModuleData {
     pub known_actives: Option<HashMap<CompoundId, bool>>,
     /// CAS connection status for health reporting.
     pub cas_connected: bool,
+    /// How CAS is routed (`NeuralApi` or `Direct`).
+    pub cas_routing: Option<CasRouting>,
     /// Datasets loaded from CAS.
     pub loaded_datasets: Vec<String>,
     /// Errors encountered during loading (for AAR).
     pub load_errors: Vec<String>,
+    /// Datasets that have been verified as fully converged (braided provenance).
+    pub converged_datasets: Vec<String>,
 }
 
 /// `GPS4Drug` pre-trained weights from CAS.
@@ -39,18 +44,25 @@ pub struct Gps4DrugWeights {
     pub config: tideglass_gps4drug::LinearRegressionConfig,
 }
 
-/// Loads module data from nestGate CAS.
+/// Loads module data from CAS (Neural API or direct nestGate).
 ///
 /// Returns partially-loaded data if some datasets fail — the system remains
 /// operational for modules with data while reporting gaps.
 pub async fn load_from_cas(client: &CasClient) -> ModuleData {
-    let mut data = ModuleData::default();
+    let mut data = ModuleData {
+        cas_routing: Some(client.routing()),
+        ..ModuleData::default()
+    };
 
     match client.list(None).await {
         Ok(list_response) => {
             data.cas_connected = true;
+            let route_label = match client.routing() {
+                CasRouting::NeuralApi => "Neural API",
+                CasRouting::Direct => "direct",
+            };
             eprintln!(
-                "tideglass: CAS connected — {} objects indexed",
+                "tideglass: CAS connected via {route_label} — {} objects indexed",
                 list_response.count
             );
         }
@@ -224,6 +236,63 @@ const fn resolve_dataset_hash(_dataset_key: &str) -> Option<CasHash> {
     None
 }
 
+/// Checks whether a dataset has converged to fully braided provenance.
+///
+/// Called by dispatch handlers before trusting pipeline outputs for the
+/// provenance chain. Not yet wired — awaiting Neural API routing to
+/// provenance trio primals (rhizoCrypt, loamSpine, sweetGrass).
+#[allow(dead_code)]
+///
+/// westGate data exists in three provenance states:
+/// - **primordial**: on disk, no CAS hash
+/// - **CAS-only**: BLAKE3 hash in CAS, but no DAG event or spine entry
+/// - **fully braided**: CAS hash + rhizoCrypt DAG + loamSpine spine + sweetGrass braid
+///
+/// Science modules should only trust computation results when input data is
+/// fully braided. This gate prevents computation on partially-provenance'd data
+/// that may later be invalidated during convergence.
+///
+/// Currently checks CAS existence only (CAS-only state). Full convergence
+/// requires querying rhizoCrypt `dag.session.query` — blocked on Neural API
+/// routing to provenance trio primals.
+pub async fn is_dataset_converged(client: &CasClient, dataset_key: &str) -> DatasetConvergence {
+    let Some(hash) = resolve_dataset_hash(dataset_key) else {
+        return DatasetConvergence::Unknown;
+    };
+
+    match client.exists(hash.as_str()).await {
+        Ok(true) => DatasetConvergence::CasOnly,
+        Ok(false) => DatasetConvergence::NotFound,
+        Err(_) => DatasetConvergence::Unknown,
+    }
+}
+
+/// Provenance convergence state for a dataset.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
+pub enum DatasetConvergence {
+    /// Not in CAS at all.
+    NotFound,
+    /// In CAS with BLAKE3 hash but no provenance chain (DAG/spine/braid).
+    CasOnly,
+    /// Fully braided: CAS + `rhizoCrypt` DAG + loamSpine + sweetGrass.
+    FullyBraided,
+    /// Cannot determine convergence state (no hash configured or CAS unreachable).
+    Unknown,
+}
+
+impl DatasetConvergence {
+    /// Whether computation is safe on this dataset.
+    ///
+    /// Currently permits `CasOnly` and `FullyBraided` — in production, only
+    /// `FullyBraided` should be trusted for results that enter the provenance chain.
+    #[must_use]
+    #[allow(dead_code)]
+    pub const fn is_computation_safe(self) -> bool {
+        matches!(self, Self::CasOnly | Self::FullyBraided)
+    }
+}
+
 // Gps4DrugWeights needs Deserialize for try_load_json
 impl<'de> Deserialize<'de> for Gps4DrugWeights {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -265,7 +334,9 @@ mod tests {
         assert!(data.gps4drug_weights.is_none());
         assert!(data.known_actives.is_none());
         assert!(!data.cas_connected);
+        assert!(data.cas_routing.is_none());
         assert!(data.loaded_datasets.is_empty());
+        assert!(data.converged_datasets.is_empty());
         assert!(data.load_errors.is_empty());
     }
 
@@ -273,5 +344,13 @@ mod tests {
     fn resolve_dataset_hash_returns_none_without_manifest() {
         assert!(resolve_dataset_hash("tideglass.compound_library").is_none());
         assert!(resolve_dataset_hash("tideglass.gps4drug_weights").is_none());
+    }
+
+    #[test]
+    fn convergence_computation_safety() {
+        assert!(!DatasetConvergence::NotFound.is_computation_safe());
+        assert!(DatasetConvergence::CasOnly.is_computation_safe());
+        assert!(DatasetConvergence::FullyBraided.is_computation_safe());
+        assert!(!DatasetConvergence::Unknown.is_computation_safe());
     }
 }

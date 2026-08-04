@@ -24,8 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - OCTAD benchmark evaluation with AUC, precision/recall, F1, concordance correlation
 - Capability-based primal discovery system
 - biomeOS cell graph and guideStone deploy definitions
-- 147 tests, 92.71% region coverage, 94.11% line coverage
+- 164 tests, clippy pedantic/nursery clean
 - cargo deny + clippy pedantic/nursery + rustfmt toolchain configs
+- G56 Neural API routing: CAS via `neural-api-default.sock` with direct fallback
+- Provenance convergence gate: `is_dataset_converged()` for mixed-state data
+- CAS routing mode reporting in health triad responses
 - ScyBorg triple license (AGPL-3.0-or-later, ORC, CC-BY-SA 4.0)
 - SPDX headers on all source and documentation files
 

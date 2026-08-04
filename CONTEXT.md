@@ -61,17 +61,20 @@ methods are implemented:
 - ZINC — screened compound library (750M+ structures)
 - NF Data Portal — NF1-driven tumor transcriptomic signatures (novel extension)
 
-CAS data loading via nestGate is a Phase 4 integration target — not yet wired
-into the running server.
+CAS data loading is wired via biomeOS Neural API (`neural-api-default.sock`)
+with graceful degradation. GPS platform data is CAS-indexed (NumPy/pickle,
+needs JSON conversion). Provenance convergence gate implemented for mixed-state
+data on westGate.
 
 ## Dependencies
 
-Rust workspace is complete (serde, serde_json, thiserror, rand, tokio).
-Python validation is deferred to a future phase. Phase 4 integrates nestGate
-CAS fetch, pseudoSpore packaging, and collaborator delivery.
+Rust workspace is complete (serde, serde_json, thiserror, rand, tokio, base64).
+Python validation is deferred to a future phase. Remaining: GPS data JSON
+conversion, Chen 2017 benchmark, provenance write via Neural API.
 
 ## Status
 
-Phase 4 — Package. Rust workspace rebuilt and tested (147 tests, 92.71%
-coverage). Current work: nestGate data integration, pseudoSpore + lithoSpore
-packaging, NF extension validation, Bin Chen review gate.
+Phase 4 — Package. Rust workspace rebuilt and tested (164 tests). G56 Neural
+API routing complete. Provenance convergence gate implemented. CAS wiring live
+with graceful degradation. Current work: GPS JSON conversion, Chen 2017
+benchmark (r >= 0.52), provenance write chain.
