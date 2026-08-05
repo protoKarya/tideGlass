@@ -92,7 +92,7 @@ Selects the most representative cell line for a disease signature by ranking LIN
 | Source | Size | Format |
 |--------|------|--------|
 | LINCS L1000 Level 5 (VCAP_t1 subset) | ~2 GB | GCTx (HDF5) |
-| GPS Platform artifact (Zenodo) | 1.5 GB | NumPy/pickle |
+| GPS Platform artifact (Zenodo) | 103 MB | JSON (converted from NumPy/pickle, CAS-ingested with BLAKE3) |
 
 ### Validation target
 

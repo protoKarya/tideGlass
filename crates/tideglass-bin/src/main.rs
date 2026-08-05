@@ -155,7 +155,13 @@ fn run_server(socket_path: &str) -> ExitCode {
     };
 
     let module_data = runtime.block_on(async {
-        let Some(info) = tideglass_core::cas::discover_cas_socket() else {
+        let info = discover_direct_nestgate()
+            .map(|path| tideglass_core::cas::CasSocketInfo {
+                path,
+                routing: tideglass_core::cas::CasRouting::Direct,
+            })
+            .or_else(tideglass_core::cas::discover_cas_socket);
+        let Some(info) = info else {
             eprintln!("tideglass: no CAS socket found — running without CAS data");
             return std::sync::Arc::new(data::ModuleData::default());
         };

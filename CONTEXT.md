@@ -52,30 +52,34 @@ methods are implemented:
 | Capabilities | `capabilities.list` |
 | Health | `health.liveness`, `health.check`, `health.readiness` |
 | Science | `science.rges_screen`, `science.rcl_select`, `science.gps4drug_predict`, `science.compound_screen`, `science.mcts_optimize`, `science.octad_benchmark`, `science.nf_score` |
+| Visualization | `visualization.rges_volcano`, `visualization.enrichment_curve`, `visualization.nf_dashboard`, `visualization.gps4drug_scatter`, `visualization.mcts_trace` |
+| Data | `data.catalog` |
 
 ## Key Data
 
-- westGate CAS federation — 519 GB local science data (13 datasets in tideGlass domain)
+- westGate CAS federation — 3.21 TB local science data (452 GB CAS pool, 153 datasets)
 - LINCS L1000 Level 5 — 1.3M drug perturbation profiles (primary source)
 - ChEMBL — bioactivity panels (JAK, kinase selectivity)
 - ZINC — screened compound library (750M+ structures)
 - NF Data Portal — NF1-driven tumor transcriptomic signatures (novel extension)
 
-CAS data loading is wired via biomeOS Neural API (`neural-api-default.sock`)
-with graceful degradation. GPS platform data is CAS-indexed (NumPy/pickle,
-needs JSON conversion). Provenance convergence gate implemented for mixed-state
-data on westGate.
+CAS data loading is wired via biomeOS Neural API (`neural-api-*.sock`, prefix-glob)
+with graceful degradation. GPS platform data converted to JSON (11 files,
+103 MB) and CAS-ingested with BLAKE3 provenance. Dataset discovery via
+`content.query` at startup. Provenance convergence gate implemented for
+mixed-state data on westGate.
 
 ## Dependencies
 
 Rust workspace is complete (serde, serde_json, thiserror, rand, tokio, base64).
-Python validation is deferred to a future phase. Remaining: GPS data JSON
-conversion, Chen 2017 benchmark, provenance write via Neural API.
+Python validation is deferred to a future phase. Remaining: Chen 2017 benchmark (r >= 0.52), cell boot on westGate,
+provenance write via Neural API.
 
 ## Status
 
 Phase 4 — Package. Rust workspace rebuilt and tested (220 tests, 17 IPC methods). G56 Neural
 API routing with direct nestGate fallback. Validated against live 13-primal
-NUCLEUS on westGate — first RGES computation on live hardware. CAS store has
-333,695 objects (54.9 GB). Current work: GPS JSON conversion, Chen 2017
-benchmark (r >= 0.52), provenance write chain.
+NUCLEUS on westGate — first RGES computation on live hardware. CAS pool at
+452 GB (convoy provenance at 145/s). GPS data converted (11 JSON, 103 MB).
+`content.query` wired. `PetalTongueClient` activated. Current work: cell boot
+on westGate, Chen 2017 benchmark (r >= 0.52), provenance write chain.

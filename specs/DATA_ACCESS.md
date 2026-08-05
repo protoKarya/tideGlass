@@ -8,8 +8,8 @@
 
 ## Data Locality
 
-tideGlass runs on westGate. All 519 GB of science data is on the same ZFS pool.
-Data access routes through the **biomeOS Neural API** (`neural-api-default.sock`)
+tideGlass runs on westGate. All 3.21 TB of science data is on the same ZFS raidz1 pool (452 GB CAS-indexed).
+Data access routes through the **biomeOS Neural API** (`neural-api-*.sock`, prefix-glob discovery)
 which capability-routes `content.get`/`content.put` to the local nestGate CAS.
 No songBird mesh traversal required.
 
@@ -56,7 +56,7 @@ varies — see Provenance Convergence section below.
 | **LINCS L1000** | 20 GB | `data/drug_discovery/lincs_l1000/` | CAS-indexed | 1 (RGES), 2 (RCL), 3 (GPS4Drug) |
 | **ChEMBL 37** | 15 GB | `data/drug_discovery/chembl/` | CAS-indexed | 1, 4 (screening), 5 (MCTS) |
 | **PubChem** | 11 GB | `data/drug_discovery/pubchem/` | CAS-indexed | 1, 4 |
-| **GPS Platform (Zenodo)** | 1.4 GB | `data/drug_discovery/gps_platform/` | CAS-indexed (NumPy/pickle — needs JSON conversion) | all |
+| **GPS Platform (Zenodo)** | 103 MB (JSON) | `data/drug_discovery/gps_platform/` | CAS-ingested (11 JSON files, BLAKE3, `content.query` discoverable) | all |
 | **BindingDB** | 583 MB | `data/drug_discovery/bindingdb/` | CAS-indexed | 5 (MCTS), 7 (NF) |
 | **ZINC20** | 244 MB | `data/drug_discovery/zinc/` | CAS-indexed | 4 (screening) |
 | **ChEBI** | 129 MB | `data/drug_discovery/chebi/` | CAS-indexed | 3 |

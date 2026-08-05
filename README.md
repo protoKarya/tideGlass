@@ -53,9 +53,9 @@ and compare our outputs against their claims.**
 
 ## Ecosystem Integration
 
-tideGlass runs as a biomeOS NUCLEUS composition on westGate (519 GB local data).
-CAS requests route through the Neural API (`neural-api-default.sock`) for
-capability-based discovery — no hardcoded primal socket paths.
+tideGlass runs as a biomeOS NUCLEUS composition on westGate (3.21 TB / 452 GB CAS pool).
+CAS requests route through the Neural API (`neural-api-*.sock`, prefix-glob
+discovery) for capability-based routing — no hardcoded primal socket paths.
 
 | Capability | Provider | How |
 |------------|----------|-----|
@@ -112,7 +112,7 @@ cargo deny check
 | Clippy | pedantic + nursery clean |
 | cargo deny | clean |
 | Unsafe code | `#![forbid(unsafe_code)]` on all crates |
-| CAS routing | G56 Neural API (`neural-api-default.sock`) |
+| CAS routing | G56 Neural API (prefix-glob discovery, direct fallback) |
 | Convergence gate | `is_dataset_converged()` for mixed-state data |
 
 ---

@@ -10,7 +10,7 @@
 
 tideGlass is a sovereign rebuild of the GPS (Gene-Expression-based Platform for Screening) published in Cell 2026. It validates published drug repurposing claims by reproducing from primary data, then rebuilds sovereign infrastructure for independent screening and compound optimization.
 
-tideGlass is a **protist** — an application composed *from* primals, not a primal itself. It runs as a NUCLEUS cell composition on westGate where all 519 GB of science data is local.
+tideGlass is a **protist** — an application composed *from* primals, not a primal itself. It runs as a NUCLEUS cell composition on westGate where all 3.21 TB of science data is local (452 GB CAS pool).
 
 ---
 
@@ -52,7 +52,7 @@ tideGlass composes from NUCLEUS primals via UDS IPC. No HTTP. No REST. All capab
 
 | Primal | Tier | Required? | Capability | Usage |
 |--------|------|-----------|------------|-------|
-| **nestGate** | 2 | Yes | `content.get`, `content.put`, `storage.store`, `storage.retrieve` | CAS data fetch — LINCS, ChEMBL, PubChem, ZINC, GEO, TCGA. All 519 GB on local ZFS. |
+| **nestGate** | 2 | Yes | `content.get`, `content.put`, `storage.store`, `storage.retrieve` | CAS data fetch — LINCS, ChEMBL, PubChem, ZINC, GEO, TCGA. 3.21 TB on local ZFS raidz1 (452 GB CAS pool). |
 | **barraCuda** | 2 | Yes | `tensor.matmul`, `tensor.create`, `stats.mean`, `linalg.solve` | RGES batch scoring matrices, GPS4Drug inference, MCTS evaluation. |
 | **toadStool** | 3 | No | `compute.dispatch`, `compute.execute` | GPU streaming dispatch for RCL training, MCTS tree search. Graceful degradation to CPU. |
 | **rhizoCrypt** | 3 | No | `dag.session.create`, `dag.event.append`, `dag.merkle.root` | Provenance DAG for each pipeline execution. |

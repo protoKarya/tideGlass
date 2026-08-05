@@ -62,7 +62,7 @@ depends_on = ["beardog"]
 by_capability = "storage"
 capabilities = ["content.get", "content.put", "storage.store", "storage.retrieve"]
 health_method = "health.liveness"
-purpose = "CAS data fetch — LINCS, ChEMBL, PubChem, ZINC (519 GB westGate federation)"
+purpose = "CAS data fetch — LINCS, ChEMBL, PubChem, ZINC (3.21 TB westGate, 452 GB CAS pool)"
 
 [[graph.nodes]]
 name = "barracuda"

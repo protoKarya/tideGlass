@@ -8,7 +8,7 @@
 
 **Goal**: Inventory the GPS platform, download all data from primary sources, reproduce Module 1 (RGES) in Python, validate against Chen 2017 published results.
 
-**Gate**: westGate | **Data**: 519 GB local
+**Gate**: westGate | **Data**: 3.21 TB local (452 GB CAS pool)
 
 ---
 

@@ -17,7 +17,7 @@ Each module produces specific visualizations via petalTongue `visualization.rend
 | Visual | Type | Data | Priority | Status |
 |--------|------|------|----------|--------|
 | **RGES Volcano Plot** | Scatter | RGES score (x) vs -log10(p) (y) | P0 — core output | **Implemented** (`visualization.rges_volcano`) |
-| **IC50 Correlation** | Scatter + regression | RGES vs IC50 for validation set | P0 — Table 1 reproduction | Awaiting data |
+| **IC50 Correlation** | Scatter + regression | RGES vs IC50 for validation set | P0 — Table 1 reproduction | Awaiting Chen 2017 benchmark run |
 | **Top Compounds Heatmap** | Heatmap | Expression profiles of top 20 reversers | P1 | Not started |
 | **Gene Set Overlap** | Venn/UpSet | Disease vs drug gene set intersections | P2 | Not started |
 

@@ -34,7 +34,7 @@ within 7 days for critical issues.
 tideGlass inherits the ecoPrimals security model:
 
 - **K-Derm topology** — trust boundaries enforced at gate assignment; tideGlass
-  runs on westGate with local CAS access (519 GB federation, no cross-gate mesh
+  runs on westGate with local CAS access (3.21 TB / 452 GB CAS pool, no cross-gate mesh
   for primary data paths)
 - **Dark Forest standards** — UDS-only IPC, BTSP-enforced transport, no
   telemetry or phone-home; capability discovery via biomeOS socket scanning
