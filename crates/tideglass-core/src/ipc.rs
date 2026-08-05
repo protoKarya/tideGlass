@@ -26,6 +26,19 @@ pub mod methods {
     /// Network fragmentation score computation.
     pub const NF_SCORE: &str = "science.nf_score";
 
+    /// RGES volcano plot visualization.
+    pub const VIZ_RGES_VOLCANO: &str = "visualization.rges_volcano";
+    /// Enrichment curve visualization.
+    pub const VIZ_ENRICHMENT_CURVE: &str = "visualization.enrichment_curve";
+    /// NF candidate dashboard visualization.
+    pub const VIZ_NF_DASHBOARD: &str = "visualization.nf_dashboard";
+    /// `GPS4Drug` prediction scatter visualization.
+    pub const VIZ_GPS4DRUG_SCATTER: &str = "visualization.gps4drug_scatter";
+    /// MCTS optimization trace visualization.
+    pub const VIZ_MCTS_TRACE: &str = "visualization.mcts_trace";
+    /// CAS data catalog visualization.
+    pub const DATA_CATALOG: &str = "data.catalog";
+
     /// Capability discovery — list methods this primal implements.
     pub const CAPABILITIES_LIST: &str = "capabilities.list";
     /// Liveness probe for orchestrators.

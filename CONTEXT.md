@@ -44,7 +44,7 @@ the ecosystem would not have discovered organically.
 
 ## IPC Methods
 
-The `tideglass` UniBin serves UDS JSON-RPC 2.0 over NDJSON framing. Eleven
+The `tideglass` UniBin serves UDS JSON-RPC 2.0 over NDJSON framing. Seventeen
 methods are implemented:
 
 | Domain | Methods |
@@ -74,7 +74,7 @@ conversion, Chen 2017 benchmark, provenance write via Neural API.
 
 ## Status
 
-Phase 4 — Package. Rust workspace rebuilt and tested (177 tests). G56 Neural
+Phase 4 — Package. Rust workspace rebuilt and tested (214 tests, 17 IPC methods). G56 Neural
 API routing with direct nestGate fallback. Validated against live 13-primal
 NUCLEUS on westGate — first RGES computation on live hardware. CAS store has
 333,695 objects (54.9 GB). Current work: GPS JSON conversion, Chen 2017

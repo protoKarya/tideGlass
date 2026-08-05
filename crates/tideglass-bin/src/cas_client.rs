@@ -14,7 +14,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UnixStream;
 
 use tideglass_core::cas::{
-    CasExistsResponse, CasGetResponse, CasListResponse, CasPutResponse, CasRouting, methods,
+    CasExistsResponse, CasGetResponse, CasListResponse, CasPutResponse, CasQueryResponse,
+    CasRouting, methods,
 };
 use tideglass_core::error::TideGlassError;
 
@@ -97,6 +98,38 @@ impl CasClient {
     pub async fn list(&self, family_id: Option<&str>) -> Result<CasListResponse, TideGlassError> {
         let params = family_id.map_or_else(|| json!({}), |fid| json!({"family_id": fid}));
         self.call(methods::CONTENT_LIST, params).await
+    }
+
+    /// Queries CAS objects by metadata (pipeline tag, source, content type).
+    ///
+    /// Uses `content.query` (nestGate v4.57+). Returns matching entries sorted
+    /// by `stored_at` descending (newest first).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TideGlassError::DataAccess`] on transport failure or if the
+    /// nestGate version does not support `content.query`.
+    pub async fn query(
+        &self,
+        pipeline: Option<&str>,
+        source: Option<&str>,
+        stored_by: Option<&str>,
+        limit: Option<u32>,
+    ) -> Result<CasQueryResponse, TideGlassError> {
+        let mut params = json!({});
+        if let Some(p) = pipeline {
+            params["pipeline"] = Value::String(p.to_owned());
+        }
+        if let Some(s) = source {
+            params["source"] = Value::String(s.to_owned());
+        }
+        if let Some(sb) = stored_by {
+            params["stored_by"] = Value::String(sb.to_owned());
+        }
+        if let Some(lim) = limit {
+            params["limit"] = Value::Number(lim.into());
+        }
+        self.call(methods::CONTENT_QUERY, params).await
     }
 
     /// Lightweight connectivity check via `health.check`.
@@ -250,5 +283,10 @@ mod tests {
         let encoded = BASE64.encode(original);
         let decoded = BASE64.decode(&encoded).expect("decode");
         assert_eq!(&decoded, original);
+    }
+
+    #[test]
+    fn content_query_method_is_correct() {
+        assert_eq!(methods::CONTENT_QUERY, "content.query");
     }
 }

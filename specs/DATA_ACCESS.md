@@ -206,9 +206,10 @@ sweetGrass: braid.create(["Chen2017", "LINCS_program", "ChEMBL"])
 ## Current Implementation Status
 
 - CAS client: **Implemented** in `tideglass-bin/src/cas_client.rs`
-- Neural API routing: **Implemented** — prefers `neural-api-default.sock`, falls back to direct
+- Neural API routing: **Implemented** — prefers `neural-api-*.sock`, falls back to direct
 - Data loading: **Implemented** — `load_from_cas()` on startup, graceful degradation
-- Convergence gate: **Implemented** — `is_dataset_converged()` API, not yet wired to dispatch
-- Data manifest: **Not yet** — awaiting hash enumeration from CAS ingest pipeline
-- GPS data format: **Blocked** — NumPy/pickle in CAS, needs JSON conversion (DIV-4)
+- Dataset discovery: **Implemented** — `content.query` by pipeline tag (nestGate v4.57+, DIV-2 RESOLVED)
+- Convergence gate: **Implemented** — `is_dataset_converged()` API uses `content.query` for hash resolution
+- GPS data format: **RESOLVED** (DIV-4) — 11 JSON files (103 MB) CAS-ingested with BLAKE3 provenance
+- `content.query` types: `CasQueryParams`, `CasQueryResponse`, `CasQueryEntry` in `tideglass-core`
 - Provenance write: **Not yet** — awaiting Neural API routing to provenance trio primals

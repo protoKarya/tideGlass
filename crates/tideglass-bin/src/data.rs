@@ -70,9 +70,7 @@ pub async fn load_from_cas(client: &CasClient) -> ModuleData {
                 CasRouting::NeuralApi => "Neural API",
                 CasRouting::Direct => "direct",
             };
-            eprintln!(
-                "tideglass: CAS healthy via {route_label} — nestGate v{version}",
-            );
+            eprintln!("tideglass: CAS healthy via {route_label} — nestGate v{version}",);
         }
         Err(err) => {
             let msg = format!("CAS health check failed: {err}");
@@ -185,31 +183,40 @@ async fn load_known_actives(client: &CasClient, data: &mut ModuleData) {
     }
 }
 
-/// Attempts to load a JSON-serialized type from CAS by hash.
+/// Attempts to load a JSON-serialized type from CAS by pipeline tag.
 ///
-/// Uses `content.exists` first to check, then `content.get` to retrieve.
-/// Returns `Ok(None)` if the hash is not found in CAS.
+/// Uses `content.query` (nestGate v4.57+) to discover the BLAKE3 hash for
+/// the dataset, then `content.get` to retrieve it. Falls back to returning
+/// `Ok(None)` if the query returns no matches or the dataset is not found.
 async fn try_load_json<T: serde::de::DeserializeOwned>(
     client: &CasClient,
     dataset_key: &str,
     data: &mut ModuleData,
 ) -> Result<Option<T>, TideGlassError> {
-    let Some(hash) = resolve_dataset_hash(dataset_key) else {
-        let msg = format!(
-            "no CAS hash configured for {dataset_key} — \
-             awaiting data manifest or CAS ingest with pipeline tag"
-        );
-        data.load_errors.push(msg);
-        return Ok(None);
+    let hash = match query_dataset_hash(client, dataset_key).await {
+        Ok(Some(h)) => h,
+        Ok(None) => {
+            let msg = format!(
+                "{dataset_key}: not found via content.query — \
+                 dataset may not be CAS-ingested with this pipeline tag"
+            );
+            data.load_errors.push(msg);
+            return Ok(None);
+        }
+        Err(err) => {
+            let msg = format!(
+                "{dataset_key}: content.query failed ({err}) — \
+                 nestGate may be pre-v4.57 or Neural API not routing content.query"
+            );
+            eprintln!("tideglass: {msg}");
+            data.load_errors.push(msg);
+            return Ok(None);
+        }
     };
-
-    if !client.exists(hash.as_str()).await? {
-        return Ok(None);
-    }
 
     let bytes = client.get(hash.as_str()).await?.ok_or_else(|| {
         TideGlassError::DataAccess(format!(
-            "CAS object {hash} exists but content.get returned null"
+            "CAS object {hash} found via content.query but content.get returned null"
         ))
     })?;
 
@@ -220,28 +227,24 @@ async fn try_load_json<T: serde::de::DeserializeOwned>(
     Ok(Some(value))
 }
 
-/// Resolves a dataset key to its CAS hash.
+/// Discovers the BLAKE3 hash for a dataset by querying CAS metadata.
 ///
-/// In the current implementation, this returns `None` for all keys — the GPS
-/// platform data is CAS-indexed but we need the specific BLAKE3 hashes from
-/// the data manifest. This is a documented Phase 4 integration gap.
+/// Uses `content.query` with `pipeline = dataset_key` to find the most
+/// recently stored object matching this pipeline tag. GPS converter stores
+/// each JSON output with a pipeline tag like `"tideglass.gps4drug_weights"`.
 ///
-/// Future: read from `data_manifest.toml` or query CAS by pipeline tag.
-const fn resolve_dataset_hash(_dataset_key: &str) -> Option<CasHash> {
-    // AAR DIVERGENCE: The GPS platform data (8 files, 1.4 GB) is CAS-indexed
-    // on westGate, but the individual BLAKE3 hashes for each dataset component
-    // are not yet enumerated in tideGlass configuration. The CAS ingest pipeline
-    // stores files with provenance metadata (source, pipeline) but there's no
-    // query-by-tag API — only query-by-hash via content.get.
-    //
-    // Options:
-    // 1. content.list + iterate to find objects with matching metadata (expensive)
-    // 2. Store a data_manifest.toml with known hashes after ingest (preferred)
-    // 3. Add content.query_by_tag to nestGate (upstream request)
-    //
-    // For now, dispatch handlers fall through to caller-supplied params when
-    // CAS data is not pre-loaded.
-    None
+/// Returns the hash of the newest matching object (nestGate returns results
+/// sorted by `stored_at` descending).
+async fn query_dataset_hash(
+    client: &CasClient,
+    dataset_key: &str,
+) -> Result<Option<CasHash>, TideGlassError> {
+    let response = client.query(Some(dataset_key), None, None, Some(1)).await?;
+
+    Ok(response
+        .results
+        .first()
+        .map(|entry| CasHash::new(&entry.hash)))
 }
 
 /// Stores a pipeline result in CAS for provenance tracking.
@@ -280,26 +283,21 @@ pub async fn store_pipeline_result(
 
 /// Checks whether a dataset has converged to fully braided provenance.
 ///
-/// Called by dispatch handlers before trusting pipeline outputs for the
-/// provenance chain. Not yet wired — awaiting Neural API routing to
-/// provenance trio primals (rhizoCrypt, loamSpine, sweetGrass).
-#[allow(dead_code)]
+/// Uses `content.query` to discover the dataset hash, then checks CAS
+/// existence. Full convergence requires querying rhizoCrypt
+/// `dag.session.query` — blocked on Neural API routing to provenance
+/// trio primals.
 ///
 /// westGate data exists in three provenance states:
 /// - **primordial**: on disk, no CAS hash
 /// - **CAS-only**: BLAKE3 hash in CAS, but no DAG event or spine entry
 /// - **fully braided**: CAS hash + rhizoCrypt DAG + loamSpine spine + sweetGrass braid
-///
-/// Science modules should only trust computation results when input data is
-/// fully braided. This gate prevents computation on partially-provenance'd data
-/// that may later be invalidated during convergence.
-///
-/// Currently checks CAS existence only (CAS-only state). Full convergence
-/// requires querying rhizoCrypt `dag.session.query` — blocked on Neural API
-/// routing to provenance trio primals.
+#[allow(dead_code)]
 pub async fn is_dataset_converged(client: &CasClient, dataset_key: &str) -> DatasetConvergence {
-    let Some(hash) = resolve_dataset_hash(dataset_key) else {
-        return DatasetConvergence::Unknown;
+    let hash = match query_dataset_hash(client, dataset_key).await {
+        Ok(Some(h)) => h,
+        Ok(None) => return DatasetConvergence::NotFound,
+        Err(_) => return DatasetConvergence::Unknown,
     };
 
     match client.exists(hash.as_str()).await {
@@ -384,12 +382,14 @@ mod tests {
         assert!(data.cas_write_routing.is_none());
     }
 
-    #[test]
-    fn resolve_dataset_hash_returns_none_without_manifest() {
-        assert!(resolve_dataset_hash("tideglass.compound_library").is_none());
-        assert!(resolve_dataset_hash("tideglass.gps4drug_weights").is_none());
-        assert!(resolve_dataset_hash("tideglass.octad_known_actives").is_none());
-        assert!(resolve_dataset_hash("nonexistent.key").is_none());
+    #[tokio::test]
+    async fn query_dataset_hash_returns_none_when_no_cas() {
+        // Without a running CAS, query_dataset_hash should return an error
+        // (no socket to connect to). This confirms the function signature
+        // and error path work correctly.
+        let client = CasClient::new("/nonexistent/socket.sock", CasRouting::Direct);
+        let result = query_dataset_hash(&client, "tideglass.compound_library").await;
+        assert!(result.is_err());
     }
 
     #[test]

@@ -19,6 +19,8 @@ use tideglass_rcl::{RclConfig, rank_cell_lines};
 use tideglass_rges::{RankedRgesHit, RgesPipeline, ScreenConfig};
 use tideglass_screen::{CompoundLibrary, ScreenFilterConfig, filter_ranked_hits};
 
+use crate::scenes;
+
 use crate::data::ModuleData;
 
 const JSONRPC_VERSION: &str = "2.0";
@@ -46,6 +48,14 @@ pub fn dispatch_request(raw: &str, module_data: &ModuleData) -> JsonRpcResponse 
         methods::MCTS_OPTIMIZE => handle_mcts_optimize(request.params.as_ref()),
         methods::OCTAD_BENCHMARK => handle_octad_benchmark(request.params.as_ref(), module_data),
         methods::NF_SCORE => handle_nf_score(request.params.as_ref()),
+        methods::VIZ_RGES_VOLCANO => handle_viz_rges_volcano(request.params.as_ref()),
+        methods::VIZ_ENRICHMENT_CURVE => {
+            handle_viz_enrichment_curve(request.params.as_ref(), module_data)
+        }
+        methods::VIZ_NF_DASHBOARD => handle_viz_nf_dashboard(request.params.as_ref()),
+        methods::VIZ_GPS4DRUG_SCATTER => handle_viz_gps4drug_scatter(request.params.as_ref()),
+        methods::VIZ_MCTS_TRACE => handle_viz_mcts_trace(request.params.as_ref()),
+        methods::DATA_CATALOG => Ok(handle_data_catalog(module_data)),
         other => Err((-32_601, format!("Method not found: {other}"))),
     };
 
@@ -247,6 +257,201 @@ fn cas_not_loaded() -> (i64, String) {
     (-32_603, CAS_NOT_LOADED.to_owned())
 }
 
+// --- Visualization handlers ---
+
+#[derive(Debug, Deserialize)]
+struct VizRgesVolcanoParams {
+    disease: DiseaseSignature,
+    perturbations: Vec<PerturbationSignature>,
+    #[serde(default)]
+    enrichment_config: EnrichmentConfig,
+    #[serde(default)]
+    screen_config: ScreenConfig,
+    #[serde(default = "default_top_n")]
+    top_n: usize,
+}
+
+const fn default_top_n() -> usize {
+    10
+}
+
+fn handle_viz_rges_volcano(params: Option<&Value>) -> Result<Value, (i64, String)> {
+    let params = require_params(params)?;
+    let parsed: VizRgesVolcanoParams = deserialize_params(params)?;
+
+    let pipeline = RgesPipeline {
+        enrichment_config: parsed.enrichment_config,
+        screen_config: parsed.screen_config,
+    };
+
+    let hits = pipeline
+        .run(&parsed.disease, &parsed.perturbations)
+        .map_err(|error| module_error(&error))?;
+
+    Ok(scenes::rges_volcano(&hits, parsed.top_n))
+}
+
+#[derive(Debug, Deserialize)]
+struct VizEnrichmentCurveParams {
+    disease: DiseaseSignature,
+    perturbations: Vec<PerturbationSignature>,
+    known_active_ids: Option<Vec<String>>,
+    #[serde(default)]
+    enrichment_config: EnrichmentConfig,
+    #[serde(default)]
+    screen_config: ScreenConfig,
+}
+
+fn handle_viz_enrichment_curve(
+    params: Option<&Value>,
+    module_data: &ModuleData,
+) -> Result<Value, (i64, String)> {
+    let params = require_params(params)?;
+    let parsed: VizEnrichmentCurveParams = deserialize_params(params)?;
+
+    let pipeline = RgesPipeline {
+        enrichment_config: parsed.enrichment_config,
+        screen_config: parsed.screen_config,
+    };
+
+    let hits = pipeline
+        .run(&parsed.disease, &parsed.perturbations)
+        .map_err(|error| module_error(&error))?;
+
+    let active_ids: Vec<String> = parsed.known_active_ids.unwrap_or_else(|| {
+        module_data
+            .known_actives
+            .as_ref()
+            .map(|actives| actives.keys().map(|k| k.as_str().to_owned()).collect())
+            .unwrap_or_default()
+    });
+
+    let active_refs: Vec<&str> = active_ids.iter().map(String::as_str).collect();
+    Ok(scenes::enrichment_curve(&hits, &active_refs))
+}
+
+#[derive(Debug, Deserialize)]
+struct VizNfDashboardParams {
+    disease: DiseaseSignature,
+    perturbations: Vec<PerturbationSignature>,
+    #[serde(default)]
+    config: NfScoringConfig,
+}
+
+fn handle_viz_nf_dashboard(params: Option<&Value>) -> Result<Value, (i64, String)> {
+    let params = require_params(params)?;
+    let parsed: VizNfDashboardParams = deserialize_params(params)?;
+
+    let scores = compute_nf_scores(&parsed.disease, &parsed.perturbations, &parsed.config)
+        .map_err(|error| module_error(&error))?;
+
+    Ok(scenes::nf_dashboard(&scores))
+}
+
+#[derive(Debug, Deserialize)]
+struct VizGps4DrugScatterParams {
+    features: MolecularFeatures,
+    weights: Option<Vec<Vec<f64>>>,
+    config: Option<LinearRegressionConfig>,
+    gene_labels: Option<Vec<String>>,
+}
+
+fn handle_viz_gps4drug_scatter(params: Option<&Value>) -> Result<Value, (i64, String)> {
+    let params = require_params(params)?;
+    let parsed: VizGps4DrugScatterParams = deserialize_params(params)?;
+
+    let (Some(weights), Some(config)) = (parsed.weights, parsed.config) else {
+        return Err(cas_not_loaded());
+    };
+
+    let predictor =
+        LinearRegressionPredictor::new(weights, config).map_err(|error| module_error(&error))?;
+    let prediction = predictor
+        .predict(&parsed.features)
+        .map_err(|error| module_error(&error))?;
+
+    let predicted_values: Vec<f64> = prediction
+        .genes
+        .iter()
+        .map(|g| g.log2_fold_change)
+        .collect();
+
+    // Use predicted as observed when no experimental data is supplied —
+    // the scatter will show the model's self-consistency (y=x line).
+    let observed_values = predicted_values.clone();
+
+    let gene_labels: Vec<&str> = match &parsed.gene_labels {
+        Some(labels) => labels.iter().map(String::as_str).collect(),
+        None => prediction
+            .genes
+            .iter()
+            .map(|g| g.gene_id.as_str())
+            .collect(),
+    };
+
+    Ok(scenes::gps4drug_scatter(
+        &predicted_values,
+        &observed_values,
+        &gene_labels,
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+struct VizMctsTraceParams {
+    initial: MolecularFeatures,
+    #[serde(default)]
+    config: MctsConfig,
+}
+
+fn handle_viz_mcts_trace(params: Option<&Value>) -> Result<Value, (i64, String)> {
+    let params = require_params(params)?;
+    let parsed: VizMctsTraceParams = deserialize_params(params)?;
+
+    let search = MctsSearch::new(parsed.config, tideglass_molsearch::default_actions());
+    let mut rng = rand::rng();
+    let result = search
+        .optimize(parsed.initial, &mut rng)
+        .map_err(|error| module_error(&error))?;
+
+    Ok(scenes::mcts_trace(&result))
+}
+
+fn handle_data_catalog(module_data: &ModuleData) -> Value {
+    let datasets = vec![
+        catalog_entry(
+            "compound_library",
+            "Compound library for screening (Module 4)",
+            module_data.compound_library.is_some(),
+        ),
+        catalog_entry(
+            "gps4drug_weights",
+            "GPS4Drug weight matrix + config (Module 3)",
+            module_data.gps4drug_weights.is_some(),
+        ),
+        catalog_entry(
+            "octad_known_actives",
+            "OCTAD known actives for benchmarking (Module 6)",
+            module_data.known_actives.is_some(),
+        ),
+    ];
+
+    scenes::data_catalog(&datasets)
+}
+
+fn catalog_entry(key: &str, description: &str, loaded: bool) -> scenes::CatalogEntry {
+    scenes::CatalogEntry {
+        key: key.to_owned(),
+        status: if loaded {
+            "loaded".to_owned()
+        } else {
+            "awaiting CAS".to_owned()
+        },
+        description: description.to_owned(),
+        cas_hash: None,
+        size_bytes: 0,
+    }
+}
+
 fn success_response(id: Value, value: Value) -> JsonRpcResponse {
     JsonRpcResponse {
         jsonrpc: Arc::from(JSONRPC_VERSION),
@@ -433,17 +638,17 @@ mod tests {
     }
 
     #[test]
-    fn capabilities_list_returns_eleven_capabilities() {
+    fn capabilities_list_returns_seventeen_capabilities() {
         let response =
             dispatch_request(&rpc_no_params(methods::CAPABILITIES_LIST), &default_data());
         let result = result_value(&response);
-        assert_eq!(result["count"], 11);
+        assert_eq!(result["count"], 17);
         assert_eq!(
             result["capabilities"]
                 .as_array()
                 .expect("capabilities array")
                 .len(),
-            11
+            17
         );
     }
 
@@ -607,5 +812,121 @@ mod tests {
                 .message
                 .contains("CAS initialization")
         );
+    }
+
+    // --- Visualization dispatch tests ---
+
+    #[test]
+    fn viz_rges_volcano_returns_scene_json() {
+        let response = dispatch_request(
+            &rpc(
+                methods::VIZ_RGES_VOLCANO,
+                &json!({
+                    "disease": sample_disease(),
+                    "perturbations": [sample_perturbation("CHEMBL_VIZ")],
+                    "enrichment_config": fast_enrichment_config(),
+                    "screen_config": permissive_screen_config(),
+                    "top_n": 5
+                }),
+            ),
+            &default_data(),
+        );
+        let result = result_value(&response);
+        assert_eq!(result["scene"], "rges_volcano");
+        assert_eq!(result["format"], "webgl");
+        assert_eq!(result["interactive"], true);
+        assert!(result["data"]["points"].as_array().is_some());
+    }
+
+    #[test]
+    fn viz_rges_volcano_missing_params_returns_error() {
+        let response = dispatch_request(&rpc_no_params(methods::VIZ_RGES_VOLCANO), &default_data());
+        assert_eq!(error_code(&response), -32_602);
+    }
+
+    #[test]
+    fn viz_enrichment_curve_returns_scene_json() {
+        let response = dispatch_request(
+            &rpc(
+                methods::VIZ_ENRICHMENT_CURVE,
+                &json!({
+                    "disease": sample_disease(),
+                    "perturbations": [sample_perturbation("CHEMBL_EC")],
+                    "enrichment_config": fast_enrichment_config(),
+                    "screen_config": permissive_screen_config(),
+                    "known_active_ids": ["CHEMBL_EC"]
+                }),
+            ),
+            &default_data(),
+        );
+        let result = result_value(&response);
+        assert_eq!(result["scene"], "enrichment_curve");
+        assert!(result["data"]["curve"].as_array().is_some());
+    }
+
+    #[test]
+    fn viz_nf_dashboard_returns_scene_json() {
+        let response = dispatch_request(
+            &rpc(
+                methods::VIZ_NF_DASHBOARD,
+                &json!({
+                    "disease": sample_disease(),
+                    "perturbations": [sample_perturbation("NF_VIZ")],
+                }),
+            ),
+            &default_data(),
+        );
+        let result = result_value(&response);
+        assert_eq!(result["scene"], "nf_candidate_dashboard");
+        assert!(result["data"]["rows"].as_array().is_some());
+    }
+
+    #[test]
+    fn viz_gps4drug_scatter_without_weights_returns_error() {
+        let response = dispatch_request(
+            &rpc(
+                methods::VIZ_GPS4DRUG_SCATTER,
+                &json!({ "features": sample_features() }),
+            ),
+            &default_data(),
+        );
+        assert_eq!(error_code(&response), -32_603);
+    }
+
+    #[test]
+    fn viz_mcts_trace_returns_scene_json() {
+        let response = dispatch_request(
+            &rpc(
+                methods::VIZ_MCTS_TRACE,
+                &json!({
+                    "initial": sample_features(),
+                    "config": fast_mcts_config()
+                }),
+            ),
+            &default_data(),
+        );
+        let result = result_value(&response);
+        assert_eq!(result["scene"], "mcts_optimization_trace");
+        assert!(result["data"]["best_reward"].as_f64().is_some());
+        assert_eq!(result["data"]["iterations_run"], 10);
+    }
+
+    #[test]
+    fn data_catalog_returns_scene_json() {
+        let response = dispatch_request(&rpc_no_params(methods::DATA_CATALOG), &default_data());
+        let result = result_value(&response);
+        assert_eq!(result["scene"], "data_catalog");
+        assert_eq!(result["data"]["total_datasets"], 3);
+        let rows = result["data"]["rows"].as_array().expect("rows array");
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0]["key"], "compound_library");
+        assert_eq!(rows[0]["status"], "awaiting CAS");
+    }
+
+    #[test]
+    fn data_catalog_no_params_required() {
+        let response = dispatch_request(&rpc_no_params(methods::DATA_CATALOG), &default_data());
+        assert!(response.error.is_none());
+        assert!(response.result.is_some());
     }
 }

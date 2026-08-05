@@ -7,7 +7,7 @@ across the workspace crates and `tideglass-bin` dispatch handlers.
 
 ## Current validation baseline
 
-- **177 Rust tests** across all nine workspace crates
+- **214 Rust tests** across all nine workspace crates
 - Zero clippy warnings (pedantic + nursery)
 - `cargo deny` clean (advisories, bans, licenses, sources)
 

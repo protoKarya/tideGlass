@@ -152,6 +152,63 @@ pub mod methods {
     pub const CONTENT_EXISTS: &str = "content.exists";
     pub const CONTENT_LIST: &str = "content.list";
     pub const CONTENT_PUT: &str = "content.put";
+    /// Query CAS by metadata (pipeline, source, `content_type`). Shipped in nestGate v4.57+.
+    pub const CONTENT_QUERY: &str = "content.query";
+}
+
+/// Parameters for `content.query` — metadata search (v4.57+).
+#[derive(Debug, Serialize)]
+pub struct CasQueryParams<'a> {
+    /// Filter by pipeline tag (e.g. `"tideglass.gps4drug_weights"`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pipeline: Option<&'a str>,
+    /// Filter by source tag.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<&'a str>,
+    /// Filter by content type.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_type: Option<&'a str>,
+    /// Filter by `stored_by` tag.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stored_by: Option<&'a str>,
+    /// Maximum number of results to return.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+}
+
+/// Single entry in a `content.query` response.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CasQueryEntry {
+    /// BLAKE3 hash of the object.
+    pub hash: String,
+    /// Object size in bytes.
+    #[serde(default)]
+    pub size: u64,
+    /// Pipeline tag, if stored.
+    #[serde(default)]
+    pub pipeline: Option<String>,
+    /// Source tag, if stored.
+    #[serde(default)]
+    pub source: Option<String>,
+    /// Content type, if stored.
+    #[serde(default)]
+    pub content_type: Option<String>,
+    /// Who stored it.
+    #[serde(default)]
+    pub stored_by: Option<String>,
+    /// ISO timestamp when stored.
+    #[serde(default)]
+    pub stored_at: Option<String>,
+}
+
+/// Response from `content.query`.
+#[derive(Debug, Deserialize)]
+pub struct CasQueryResponse {
+    /// Matching objects.
+    pub results: Vec<CasQueryEntry>,
+    /// Number of matches.
+    #[serde(default)]
+    pub count: u64,
 }
 
 /// Environment variable for Neural API socket override.
@@ -403,5 +460,53 @@ mod tests {
     fn cas_routing_variants() {
         assert_eq!(CasRouting::NeuralApi, CasRouting::NeuralApi);
         assert_ne!(CasRouting::NeuralApi, CasRouting::Direct);
+    }
+
+    #[test]
+    fn cas_query_params_serializes_with_pipeline() {
+        let params = CasQueryParams {
+            pipeline: Some("tideglass.gps4drug_weights"),
+            source: None,
+            content_type: None,
+            stored_by: None,
+            limit: Some(1),
+        };
+        let json = serde_json::to_value(&params).expect("serialize");
+        assert_eq!(json["pipeline"], "tideglass.gps4drug_weights");
+        assert_eq!(json["limit"], 1);
+        assert!(json.get("source").is_none());
+    }
+
+    #[test]
+    fn cas_query_response_deserializes() {
+        let json = serde_json::json!({
+            "results": [
+                {"hash": "abc123", "size": 1000, "pipeline": "tideglass.weights", "stored_at": "2026-08-04T12:00:00Z"},
+                {"hash": "def456", "size": 2000}
+            ],
+            "count": 2
+        });
+        let response: CasQueryResponse = serde_json::from_value(json).expect("deserialize");
+        assert_eq!(response.results.len(), 2);
+        assert_eq!(response.count, 2);
+        assert_eq!(response.results[0].hash, "abc123");
+        assert_eq!(
+            response.results[0].pipeline.as_deref(),
+            Some("tideglass.weights")
+        );
+        assert!(response.results[1].pipeline.is_none());
+    }
+
+    #[test]
+    fn cas_query_response_deserializes_empty() {
+        let json = serde_json::json!({"results": [], "count": 0});
+        let response: CasQueryResponse = serde_json::from_value(json).expect("deserialize");
+        assert!(response.results.is_empty());
+        assert_eq!(response.count, 0);
+    }
+
+    #[test]
+    fn content_query_method_constant() {
+        assert_eq!(methods::CONTENT_QUERY, "content.query");
     }
 }

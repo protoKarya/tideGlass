@@ -8,6 +8,8 @@ mod cas_client;
 mod data;
 mod dispatch;
 mod health;
+mod petaltongue;
+mod scenes;
 mod server;
 
 use std::process::ExitCode;
@@ -162,24 +164,17 @@ fn run_server(socket_path: &str) -> ExitCode {
             tideglass_core::cas::CasRouting::NeuralApi => "Neural API",
             tideglass_core::cas::CasRouting::Direct => "direct",
         };
-        eprintln!(
-            "tideglass: CAS discovered at {} ({route_label})",
-            info.path
-        );
+        eprintln!("tideglass: CAS discovered at {} ({route_label})", info.path);
 
         let client = cas_client::CasClient::new(&info.path, info.routing);
         let loaded = data::load_from_cas(&client).await;
 
-        if !loaded.cas_connected
-            && info.routing == tideglass_core::cas::CasRouting::NeuralApi
-        {
+        if !loaded.cas_connected && info.routing == tideglass_core::cas::CasRouting::NeuralApi {
             eprintln!("tideglass: Neural API unresponsive — falling back to direct nestGate");
             if let Some(direct) = discover_direct_nestgate() {
                 eprintln!("tideglass: direct CAS at {direct}");
-                let fallback_client = cas_client::CasClient::new(
-                    &direct,
-                    tideglass_core::cas::CasRouting::Direct,
-                );
+                let fallback_client =
+                    cas_client::CasClient::new(&direct, tideglass_core::cas::CasRouting::Direct);
                 return std::sync::Arc::new(data::load_from_cas(&fallback_client).await);
             }
             eprintln!("tideglass: no direct nestGate socket found");
@@ -187,6 +182,26 @@ fn run_server(socket_path: &str) -> ExitCode {
 
         std::sync::Arc::new(loaded)
     });
+
+    // petalTongue discovery for visualization routing
+    match petaltongue::discover_petaltongue_socket() {
+        Some(info) => {
+            let route = match info.routing {
+                petaltongue::PetalTongueRouting::NeuralApi => "Neural API",
+                petaltongue::PetalTongueRouting::Direct => "direct",
+            };
+            eprintln!(
+                "tideglass: petalTongue discovered at {} ({route})",
+                info.path
+            );
+        }
+        None => {
+            eprintln!(
+                "tideglass: no petalTongue socket found — \
+                 visualization scenes will be returned as JSON only"
+            );
+        }
+    }
 
     if let Err(error) = runtime.block_on(server::run_server(socket_path, module_data)) {
         eprintln!("tideglass: server error: {error}");

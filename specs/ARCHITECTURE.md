@@ -160,7 +160,7 @@ biomeos deploy --graph graphs/cells/tideglass_cell.toml
 
 | Metric | Value |
 |--------|-------|
-| Tests | 177 (`cargo test --workspace`) |
+| Tests | 214 (`cargo test --workspace`) |
 | Coverage | `cargo llvm-cov --workspace --all-features` (run locally for current numbers) |
 | Unsafe code | `#![forbid(unsafe_code)]` on all workspace crates |
 | Dependencies | Pure Rust — no C bindings or FFI in the workspace |

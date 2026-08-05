@@ -27,8 +27,9 @@ GPS rebuild is the first lens ground into the glass. The platform will extend to
 NF (neurofibromatosis) drug repurposing as its first novel application.
 
 The as-built system is a pure-Rust workspace: nine crates, a single `tideglass`
-UniBin binary, and a UDS JSON-RPC 2.0 server exposing eleven IPC methods across
-all seven science modules.
+UniBin binary, and a UDS JSON-RPC 2.0 server exposing seventeen IPC methods —
+seven science modules, five petalTongue visualization scenes, a data catalog,
+and the health/capabilities triad.
 
 **We do not fork. We do not patch. We read the methods as a specification, fetch
 raw data from primary sources, implement from the mathematics, train from scratch,
@@ -106,7 +107,8 @@ cargo deny check
 
 | Metric | Value |
 |--------|-------|
-| Tests | 177 |
+| Tests | 214 |
+| IPC methods | 17 (7 science + 5 viz + 1 catalog + 4 infra) |
 | Clippy | pedantic + nursery clean |
 | cargo deny | clean |
 | Unsafe code | `#![forbid(unsafe_code)]` on all crates |

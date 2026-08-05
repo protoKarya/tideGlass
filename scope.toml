@@ -158,6 +158,46 @@ depends_on = ["reversal_screening"]
 
 # --- Primals (Tier 3, optional graceful degradation) ---
 
+# --- Visualization (petalTongue-first, P0 scenes implemented) ---
+
+[[visualization]]
+method = "visualization.rges_volcano"
+scene = "rges_volcano"
+module = "tideglass-rges"
+status = "implemented"
+
+[[visualization]]
+method = "visualization.enrichment_curve"
+scene = "enrichment_curve"
+module = "tideglass-screen"
+status = "implemented"
+
+[[visualization]]
+method = "visualization.nf_dashboard"
+scene = "nf_candidate_dashboard"
+module = "tideglass-nf"
+status = "implemented"
+
+[[visualization]]
+method = "visualization.gps4drug_scatter"
+scene = "gps4drug_prediction_scatter"
+module = "tideglass-gps4drug"
+status = "implemented"
+
+[[visualization]]
+method = "visualization.mcts_trace"
+scene = "mcts_optimization_trace"
+module = "tideglass-molsearch"
+status = "implemented"
+
+[[visualization]]
+method = "data.catalog"
+scene = "data_catalog"
+module = "tideglass-bin"
+status = "implemented"
+
+# --- Primals (Tier 3, optional graceful degradation) ---
+
 [[primal]]
 name = "rhizoCrypt"
 tier = 3

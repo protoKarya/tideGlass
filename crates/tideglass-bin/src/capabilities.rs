@@ -50,6 +50,27 @@ fn all_capabilities() -> Vec<Capability> {
         ),
         capability(methods::OCTAD_BENCHMARK, "OCTAD benchmark evaluation"),
         capability(methods::NF_SCORE, "Network fragmentation score computation"),
+        capability(
+            methods::VIZ_RGES_VOLCANO,
+            "RGES volcano plot (petalTongue scene)",
+        ),
+        capability(
+            methods::VIZ_ENRICHMENT_CURVE,
+            "Enrichment curve visualization (petalTongue scene)",
+        ),
+        capability(
+            methods::VIZ_NF_DASHBOARD,
+            "NF candidate dashboard (petalTongue scene)",
+        ),
+        capability(
+            methods::VIZ_GPS4DRUG_SCATTER,
+            "GPS4Drug prediction scatter (petalTongue scene)",
+        ),
+        capability(
+            methods::VIZ_MCTS_TRACE,
+            "MCTS optimization trace (petalTongue scene)",
+        ),
+        capability(methods::DATA_CATALOG, "CAS dataset catalog"),
     ]
 }
 
@@ -68,9 +89,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn list_returns_eleven_capabilities() {
+    fn list_returns_seventeen_capabilities() {
         let response = list();
-        assert_eq!(response["count"], 11);
+        assert_eq!(response["count"], 17);
         assert_eq!(response["primal"], "tideglass");
         assert_eq!(response["version"], VERSION);
         assert_eq!(
@@ -78,12 +99,12 @@ mod tests {
                 .as_array()
                 .expect("capabilities array")
                 .len(),
-            11
+            17
         );
     }
 
     #[test]
-    fn list_includes_all_science_and_health_methods() {
+    fn list_includes_all_science_health_viz_and_data_methods() {
         let response = list();
         let listed_methods: Vec<&str> = response["capabilities"]
             .as_array()
@@ -104,6 +125,12 @@ mod tests {
             methods::MCTS_OPTIMIZE,
             methods::OCTAD_BENCHMARK,
             methods::NF_SCORE,
+            methods::VIZ_RGES_VOLCANO,
+            methods::VIZ_ENRICHMENT_CURVE,
+            methods::VIZ_NF_DASHBOARD,
+            methods::VIZ_GPS4DRUG_SCATTER,
+            methods::VIZ_MCTS_TRACE,
+            methods::DATA_CATALOG,
         ] {
             assert!(
                 listed_methods.contains(&expected),

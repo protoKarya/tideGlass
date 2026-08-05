@@ -58,6 +58,12 @@ exposed = [
     "science.mcts_optimize",
     "science.octad_benchmark",
     "science.nf_score",
+    "visualization.rges_volcano",
+    "visualization.enrichment_curve",
+    "visualization.nf_dashboard",
+    "visualization.gps4drug_scatter",
+    "visualization.mcts_trace",
+    "data.catalog",
 ]
 
 [graph.modules]
@@ -252,7 +258,7 @@ depends_on = [
     "sweetgrass",
 ]
 output = "tideglass-ready"
-capabilities = ["science", "health"]
+capabilities = ["science", "health", "visualization"]
 
 [nodes.protist]
 binary = "tideglass"
@@ -287,6 +293,12 @@ modules = [
 "science.mcts_optimize" = "science.mcts_optimize"
 "science.octad_benchmark" = "science.octad_benchmark"
 "science.nf_score" = "science.nf_score"
+"visualization.rges_volcano" = "visualization.rges_volcano"
+"visualization.enrichment_curve" = "visualization.enrichment_curve"
+"visualization.nf_dashboard" = "visualization.nf_dashboard"
+"visualization.gps4drug_scatter" = "visualization.gps4drug_scatter"
+"visualization.mcts_trace" = "visualization.mcts_trace"
+"data.catalog" = "data.catalog"
 
 [nodes.constraints]
 timeout_ms = 120000

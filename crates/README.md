@@ -25,7 +25,7 @@ into a single JSON-RPC server over UDS.
 - All module crates depend on `tideglass-core`.
 - `tideglass-screen` also depends on `tideglass-rges` and `tideglass-gps4drug`.
 - `tideglass-molsearch` depends on `tideglass-gps4drug`.
-- `tideglass-bin` links all module crates and exposes eleven JSON-RPC methods
+- `tideglass-bin` links all module crates and exposes seventeen JSON-RPC methods
   (`capabilities.list`, three health probes, seven science methods).
 - Module crates do not compile against primal crates — composition with nestGate,
   barraCuda, and the provenance trio happens at runtime via biomeOS deploy graphs.
