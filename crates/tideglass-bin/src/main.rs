@@ -184,26 +184,31 @@ fn run_server(socket_path: &str) -> ExitCode {
     });
 
     // petalTongue discovery for visualization routing
-    match petaltongue::discover_petaltongue_socket() {
-        Some(info) => {
-            let route = match info.routing {
-                petaltongue::PetalTongueRouting::NeuralApi => "Neural API",
-                petaltongue::PetalTongueRouting::Direct => "direct",
-            };
-            eprintln!(
-                "tideglass: petalTongue discovered at {} ({route})",
-                info.path
-            );
-        }
-        None => {
-            eprintln!(
-                "tideglass: no petalTongue socket found — \
-                 visualization scenes will be returned as JSON only"
-            );
-        }
-    }
+    let petal_client = if let Some(info) = petaltongue::discover_petaltongue_socket() {
+        let route = match info.routing {
+            petaltongue::PetalTongueRouting::NeuralApi => "Neural API",
+            petaltongue::PetalTongueRouting::Direct => "direct",
+        };
+        eprintln!(
+            "tideglass: petalTongue discovered at {} ({route})",
+            info.path
+        );
+        let client = petaltongue::PetalTongueClient::new(&info.path, info.routing);
+        Some(std::sync::Arc::new(client))
+    } else {
+        eprintln!(
+            "tideglass: no petalTongue socket found — \
+             visualization scenes will be returned as JSON only"
+        );
+        None
+    };
 
-    if let Err(error) = runtime.block_on(server::run_server(socket_path, module_data)) {
+    let ctx = std::sync::Arc::new(server::ServerContext {
+        module_data,
+        petal_client,
+    });
+
+    if let Err(error) = runtime.block_on(server::run_server(socket_path, ctx)) {
         eprintln!("tideglass: server error: {error}");
         return ExitCode::FAILURE;
     }

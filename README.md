@@ -107,7 +107,7 @@ cargo deny check
 
 | Metric | Value |
 |--------|-------|
-| Tests | 214 |
+| Tests | 220 |
 | IPC methods | 17 (7 science + 5 viz + 1 catalog + 4 infra) |
 | Clippy | pedantic + nursery clean |
 | cargo deny | clean |

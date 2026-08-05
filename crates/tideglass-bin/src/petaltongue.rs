@@ -16,11 +16,13 @@ use tokio::net::UnixStream;
 use tideglass_core::error::TideGlassError;
 
 /// petalTongue visualization method constants.
-#[allow(dead_code)]
 pub mod methods {
     pub const RENDER_SCENE: &str = "visualization.render.scene";
+    #[allow(dead_code)]
     pub const RENDER_STREAM: &str = "visualization.render.stream";
+    #[allow(dead_code)]
     pub const SCENE_UPDATE: &str = "visualization.scene.update";
+    #[allow(dead_code)]
     pub const SCENE_CLOSE: &str = "visualization.scene.close";
 }
 
@@ -56,16 +58,15 @@ pub struct SceneHandle {
 
 /// Async client for petalTongue scene rendering over UDS.
 ///
-/// Not yet instantiated in the dispatch loop — visualization methods currently
-/// return scene JSON directly. When petalTongue is co-deployed on westGate,
-/// the server startup will create a client and forward scenes.
-#[allow(dead_code)]
+/// Instantiated at server startup when a petalTongue socket is discovered.
+/// Shared via `Arc` across connections. The server forwards visualization
+/// scene JSON to petalTongue after dispatch returns it.
 pub struct PetalTongueClient {
     socket_path: Arc<str>,
+    #[allow(dead_code)]
     routing: PetalTongueRouting,
 }
 
-#[allow(dead_code)]
 impl PetalTongueClient {
     #[must_use]
     pub fn new(socket_path: &str, routing: PetalTongueRouting) -> Self {
@@ -76,11 +77,13 @@ impl PetalTongueClient {
     }
 
     #[must_use]
+    #[allow(dead_code)]
     pub const fn routing(&self) -> PetalTongueRouting {
         self.routing
     }
 
     #[must_use]
+    #[allow(dead_code)]
     pub fn socket_path(&self) -> &str {
         &self.socket_path
     }
@@ -112,6 +115,7 @@ impl PetalTongueClient {
     /// # Errors
     ///
     /// Returns [`TideGlassError::Transport`] if the socket is unreachable.
+    #[allow(dead_code)]
     pub async fn check_health(&self) -> Result<String, TideGlassError> {
         let response: Value = self.call("health.check", json!({})).await?;
         let version = response
@@ -191,6 +195,13 @@ impl PetalTongueClient {
     }
 }
 
+/// Returns `true` if the given JSON-RPC method name is a visualization method
+/// that should be forwarded to petalTongue when available.
+#[must_use]
+pub fn is_viz_method(method: &str) -> bool {
+    method.starts_with("visualization.") || method.starts_with("viz.")
+}
+
 /// Discovers the petalTongue socket using Neural API or direct scan.
 ///
 /// Priority:
@@ -267,6 +278,18 @@ mod tests {
     fn routing_variants_eq() {
         assert_eq!(PetalTongueRouting::Direct, PetalTongueRouting::Direct);
         assert_ne!(PetalTongueRouting::Direct, PetalTongueRouting::NeuralApi);
+    }
+
+    #[test]
+    fn is_viz_method_matches_visualization_prefix() {
+        assert!(is_viz_method("visualization.render.scene"));
+        assert!(is_viz_method("visualization.scene.update"));
+        assert!(is_viz_method("viz.rges_volcano"));
+        assert!(is_viz_method("viz.enrichment_curve"));
+        assert!(!is_viz_method("science.rges_screen"));
+        assert!(!is_viz_method("health.check"));
+        assert!(!is_viz_method("data.catalog"));
+        assert!(!is_viz_method("capabilities.list"));
     }
 
     #[test]

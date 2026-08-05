@@ -2,7 +2,7 @@
 # Cellular deployment graph: tideGlass — sovereign drug repurposing protist
 #
 # Spring identity: tideGlass (protist), consuming healthSpring validated science.
-# Gate: westGate (519 GB local CAS federation).
+# Gate: westGate (3.21 TB / 452 GB CAS pool on ZFS raidz1).
 # Data: LINCS L1000, ChEMBL, PubChem, ZINC, TCGA, GEO via nestGate CAS.
 #
 # Deploy: biomeos nucleus attach --cell graphs/cells/tideglass_cell.toml
@@ -25,7 +25,8 @@ security_model = "btsp_enforced"
 transport = "uds_only"
 composition_model = "nest_heavy"
 petaltongue_mode = "live"
-data_federation_gb = 519
+data_federation_tb = 3.21
+cas_pool_gb = 452
 
 [graph.data_dependencies]
 # All datasets accessed via nestGate CAS on westGate (local ZFS, no mesh).

@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - OCTAD benchmark evaluation with AUC, precision/recall, F1, concordance correlation
 - Capability-based primal discovery system
 - biomeOS cell graph and guideStone deploy definitions
-- 214 tests, clippy pedantic/nursery clean, zero warnings
+- 220 tests, clippy pedantic/nursery clean, zero warnings
 - Live NUCLEUS validation on westGate — first RGES computation on hardware
 - cargo deny + clippy pedantic/nursery + rustfmt toolchain configs
 - G56 Neural API routing: prefix-glob socket discovery in `membrane/` with direct fallback
@@ -44,6 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CasClient::query()` — discover datasets by pipeline tag at startup
 - `query_dataset_hash()` replaces dead `resolve_dataset_hash()` — live CAS resolution
 - `CasQueryParams`, `CasQueryResponse`, `CasQueryEntry` types in `tideglass-core`
+- `PetalTongueClient` activated — instantiated at startup, viz scenes forwarded to petalTongue
+- `ServerContext` replaces separate `Arc<ModuleData>` — carries both data and petalTongue client
+- `is_viz_method()` and `extract_method()` for server-side scene forwarding
 - All 21 transitive dependencies verified pure Rust (no C FFI)
 - ScyBorg triple license (AGPL-3.0-or-later, ORC, CC-BY-SA 4.0)
 - SPDX headers on all source and documentation files
